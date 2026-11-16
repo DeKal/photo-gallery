@@ -2,6 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.api.cluster import router as cluster_router
+from app.api.persons import router as persons_router
 from app.api.scan import router as scan_router
 
 app = FastAPI(title="photo-backend")
@@ -22,3 +23,4 @@ def health() -> dict[str, str]:
 
 app.include_router(scan_router)
 app.include_router(cluster_router)
+app.include_router(persons_router)
