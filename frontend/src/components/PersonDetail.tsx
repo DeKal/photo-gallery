@@ -50,6 +50,7 @@ export default function PersonDetail({ personId, onBack, onChanged }: Props) {
         <input
           type="text"
           placeholder="Name this person"
+          data-testid="person-name-input"
           value={name}
           onChange={(e) => setName(e.target.value)}
           onKeyDown={(e) => {
@@ -58,6 +59,7 @@ export default function PersonDetail({ personId, onBack, onChanged }: Props) {
         />
         <button
           className="primary"
+          data-testid="person-save-btn"
           onClick={() => void save()}
           disabled={saving || !name.trim()}
         >

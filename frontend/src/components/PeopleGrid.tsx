@@ -107,6 +107,7 @@ export default function PeopleGrid() {
           <div
             key={p.id}
             className={`card ${selected.has(p.id) ? "selected" : ""}`}
+            data-testid="person-card"
             onClick={() => (selectMode ? toggle(p.id) : setOpenId(p.id))}
           >
             {selectMode && (

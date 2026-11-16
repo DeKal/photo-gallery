@@ -74,6 +74,7 @@ export default function SimilarGrid() {
           <div
             key={c.id}
             className="card"
+            data-testid="sim-cluster-card"
             onClick={() => setView({ kind: "cluster", cluster: c })}
           >
             {c.cover_photo_id != null ? (
@@ -137,6 +138,7 @@ function ClusterPhotos({
           <div
             key={photo.id}
             className="photo-tile"
+            data-testid="cluster-photo"
             onClick={() => onPhoto(photo.id)}
           >
             <img
@@ -188,7 +190,7 @@ function SimilarPanel({
         <img src={imageUrl(photoId)} alt={`Photo ${photoId}`} />
       </div>
 
-      <div className="more-like-this">
+      <div className="more-like-this" data-testid="more-like-this">
         {error && <div className="error-text">{error}</div>}
         {loading && <div className="loading">Finding similar photos…</div>}
         {!loading && results.length === 0 && (

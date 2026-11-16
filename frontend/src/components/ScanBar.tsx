@@ -79,6 +79,7 @@ export default function ScanBar({ onClustered }: Props) {
         <input
           type="text"
           placeholder="/path/to/your/photos"
+          data-testid="scan-input"
           value={path}
           onChange={(e) => setPath(e.target.value)}
           onKeyDown={(e) => {
@@ -88,6 +89,7 @@ export default function ScanBar({ onClustered }: Props) {
         />
         <button
           className="primary"
+          data-testid="scan-btn"
           onClick={() => void onScan()}
           disabled={busy || !path.trim()}
         >
@@ -106,6 +108,7 @@ export default function ScanBar({ onClustered }: Props) {
               className={`status-pill ${
                 phase === "clustering" ? "running" : scan?.status ?? ""
               }`}
+              data-testid="scan-status"
             >
               {phase === "clustering" ? "clustering" : scan?.status}
             </span>
