@@ -94,6 +94,10 @@ export function getScan(id: number): Promise<Scan> {
   return request(`/scan/${id}`);
 }
 
+export function pickFolder(): Promise<{ path: string | null }> {
+  return request("/pick-folder");
+}
+
 export function cluster(): Promise<ClusterResult> {
   return request("/cluster", { method: "POST" });
 }

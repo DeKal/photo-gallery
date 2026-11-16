@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { startScan, getScan, cluster, type Scan } from "../api";
+import { startScan, getScan, cluster, pickFolder, type Scan } from "../api";
 
 interface Props {
   // Called once a scan has completed AND clustering has finished, so the
@@ -69,6 +69,16 @@ export default function ScanBar({ onClustered }: Props) {
     }
   }
 
+  async function onBrowse() {
+    setError(null);
+    try {
+      const { path: picked } = await pickFolder();
+      if (picked) setPath(picked);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    }
+  }
+
   const total = scan?.total ?? 0;
   const done = scan?.done ?? 0;
   const pct = total > 0 ? Math.round((done / total) * 100) : 0;
@@ -87,6 +97,13 @@ export default function ScanBar({ onClustered }: Props) {
           }}
           disabled={busy}
         />
+        <button
+          data-testid="browse-btn"
+          onClick={() => void onBrowse()}
+          disabled={busy}
+        >
+          Browse…
+        </button>
         <button
           className="primary"
           data-testid="scan-btn"

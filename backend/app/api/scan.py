@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import os
+import subprocess
+import sys
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from sqlalchemy.orm import Session
@@ -41,3 +43,35 @@ def get_scan(scan_id: int, session: Session = Depends(get_session)) -> Scan:
     if scan is None:
         raise HTTPException(status_code=404, detail="scan not found")
     return scan
+
+
+@router.get("/pick-folder")
+def pick_folder() -> dict[str, str | None]:
+    """Open a native folder picker on the host and return the chosen path.
+
+    The backend runs natively on the user's machine, so it can pop the OS
+    dialog directly. Returns ``{"path": null}`` if the user cancels. Only
+    macOS (osascript) is supported; other platforms return 501.
+    """
+    if sys.platform != "darwin":
+        raise HTTPException(
+            status_code=501, detail="folder picker only supported on macOS"
+        )
+    script = (
+        'POSIX path of (choose folder with prompt "Select your photos folder")'
+    )
+    try:
+        out = subprocess.run(
+            ["osascript", "-e", script],
+            capture_output=True,
+            text=True,
+            timeout=300,
+        )
+    except Exception as e:  # noqa: BLE001 - surface any launch failure as 500
+        raise HTTPException(status_code=500, detail=str(e)) from e
+    # User pressed Cancel -> osascript exits non-zero with "User canceled".
+    if out.returncode != 0:
+        if "User canceled" in out.stderr:
+            return {"path": None}
+        raise HTTPException(status_code=500, detail=out.stderr.strip() or "picker failed")
+    return {"path": out.stdout.strip() or None}
