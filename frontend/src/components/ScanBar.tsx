@@ -137,7 +137,7 @@ export default function ScanBar({ onClustered }: Props) {
           </div>
           <div className="progress-track">
             <div
-              className="progress-fill"
+              className={`progress-fill ${phase === "clustering" ? "clustering" : ""}`}
               style={{ width: `${phase === "clustering" ? 100 : pct}%` }}
             />
           </div>

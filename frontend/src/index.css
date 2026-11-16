@@ -1,18 +1,38 @@
 :root {
-  --bg: #f7f7f8;
-  --surface: #ffffff;
-  --border: #e3e3e6;
-  --text: #1d1d1f;
-  --muted: #6b6b70;
-  --accent: #2563eb;
-  --accent-contrast: #ffffff;
-  --danger: #dc2626;
-  --radius: 10px;
+  /* ---- Dark, photo-first palette (Soft UI Evolution) ------------------- */
+  --bg: #0b0d12;
+  --bg-elev: #0f1117;
+  --surface: #171922;
+  --surface-2: #1d2029;
+  --border: #272b36;
+  --border-strong: #353a49;
+  --text: #e7e9ee;
+  --muted: #9aa0ad;
 
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica,
-    Arial, sans-serif;
+  --accent: #6366f1; /* indigo primary */
+  --accent-hover: #818cf8;
+  --accent-contrast: #ffffff;
+  --accent-soft: rgba(99, 102, 241, 0.16);
+
+  --success: #10b981;
+  --danger: #ef4444;
+
+  --radius: 14px;
+  --radius-sm: 10px;
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-2: 0 8px 24px rgba(0, 0, 0, 0.45);
+  --ring: 0 0 0 3px var(--accent-soft);
+
+  --font-body: "Work Sans", -apple-system, BlinkMacSystemFont, "Segoe UI",
+    Roboto, Helvetica, Arial, sans-serif;
+  --font-head: "Outfit", var(--font-body);
+
+  font-family: var(--font-body);
   color: var(--text);
   background: var(--bg);
+  color-scheme: dark;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
 * {
@@ -28,54 +48,119 @@ body,
 }
 
 body {
-  background: var(--bg);
+  background: radial-gradient(
+      1200px 600px at 80% -10%,
+      rgba(99, 102, 241, 0.1),
+      transparent 60%
+    ),
+    var(--bg);
   color: var(--text);
+  line-height: 1.5;
 }
+
+h1,
+h2,
+h3 {
+  font-family: var(--font-head);
+  letter-spacing: -0.01em;
+}
+
+/* ---- Controls ------------------------------------------------------------ */
 
 button {
   font: inherit;
+  font-weight: 500;
   cursor: pointer;
-  border: 1px solid var(--border);
-  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  background: var(--surface-2);
   color: var(--text);
-  border-radius: 8px;
-  padding: 0.45rem 0.85rem;
-  transition: background 0.12s ease, border-color 0.12s ease;
+  border-radius: var(--radius-sm);
+  padding: 0.5rem 0.9rem;
+  transition: background 0.15s ease, border-color 0.15s ease,
+    transform 0.1s ease, box-shadow 0.15s ease;
 }
 
 button:hover:not(:disabled) {
   border-color: var(--accent);
+  background: var(--surface);
+}
+
+button:active:not(:disabled) {
+  transform: translateY(1px);
+}
+
+button:focus-visible {
+  outline: none;
+  box-shadow: var(--ring);
+  border-color: var(--accent);
 }
 
 button:disabled {
-  opacity: 0.5;
+  opacity: 0.45;
   cursor: not-allowed;
 }
 
 button.primary {
-  background: var(--accent);
-  border-color: var(--accent);
+  background: linear-gradient(180deg, var(--accent-hover), var(--accent));
+  border-color: transparent;
   color: var(--accent-contrast);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.12) inset,
+    0 6px 16px rgba(99, 102, 241, 0.3);
 }
 
 button.primary:hover:not(:disabled) {
-  filter: brightness(1.05);
+  filter: brightness(1.06);
+  border-color: transparent;
 }
 
 input[type="text"] {
   font: inherit;
-  padding: 0.45rem 0.6rem;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--surface);
+  padding: 0.55rem 0.75rem;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--bg-elev);
   color: var(--text);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+input[type="text"]::placeholder {
+  color: var(--muted);
 }
 
 input[type="text"]:focus {
   outline: none;
   border-color: var(--accent);
+  box-shadow: var(--ring);
 }
 
 a {
-  color: var(--accent);
+  color: var(--accent-hover);
+}
+
+::selection {
+  background: var(--accent-soft);
+}
+
+/* ---- Custom scrollbar ---------------------------------------------------- */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+*::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 999px;
+  border: 2px solid var(--bg);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
 }

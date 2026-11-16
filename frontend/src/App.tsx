@@ -14,7 +14,11 @@ export default function App() {
   return (
     <div className="app">
       <div className="topbar">
-        <h1>Photo Clustering</h1>
+        <h1>
+          <span className="logo" aria-hidden="true" />
+          PhotoCluster
+          <span className="sub">group photos by person &amp; similarity</span>
+        </h1>
         <ScanBar onClustered={() => setRefreshKey((k) => k + 1)} />
         <div className="tabs">
           <button
