@@ -1,6 +1,8 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.api.scan import router as scan_router
+
 app = FastAPI(title="photo-backend")
 
 app.add_middleware(
@@ -15,3 +17,6 @@ app.add_middleware(
 @app.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}
+
+
+app.include_router(scan_router)
