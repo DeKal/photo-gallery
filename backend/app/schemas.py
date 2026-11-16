@@ -48,6 +48,23 @@ class PhotoOut(BaseModel):
     thumb_path: Optional[str] = None
 
 
+class SimClusterOut(BaseModel):
+    """A visual-similarity cluster with a cover photo and member count."""
+
+    id: int
+    label: Optional[str] = None
+    cover_photo_id: Optional[int] = None
+    photo_count: int
+
+
+class SimilarPhoto(BaseModel):
+    """A photo near a query photo, by cosine distance (smaller = closer)."""
+
+    photo_id: int
+    distance: float
+    thumb_path: Optional[str] = None
+
+
 class RenameRequest(BaseModel):
     """Request body for ``PATCH /persons/{id}``."""
 
