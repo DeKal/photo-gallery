@@ -157,7 +157,7 @@ export default function AllPhotosGrid({
                   <div className="absolute inset-x-0 bottom-0 p-2 bg-gradient-to-t from-surface-dim/95 via-surface-dim/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex flex-col gap-1.5">
                     {p.persons.length > 0 && (
                       <div className="flex flex-wrap gap-1">
-                        {p.persons.map((pp) => (
+                        {p.persons.slice(0, 5).map((pp) => (
                           <button
                             key={pp.id}
                             onClick={(e) => {
@@ -171,6 +171,11 @@ export default function AllPhotosGrid({
                             <span className="truncate">{pp.name ?? `Person ${pp.id}`}</span>
                           </button>
                         ))}
+                        {p.persons.length > 5 && (
+                          <span className="flex items-center px-1.5 py-0.5 rounded-full bg-black/50 text-white text-[11px] font-medium">
+                            +{p.persons.length - 5}
+                          </span>
+                        )}
                       </div>
                     )}
                     <div className="flex items-center justify-between text-[14px] font-mono text-on-surface">
