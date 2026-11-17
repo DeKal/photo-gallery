@@ -36,21 +36,25 @@ export default function PeopleGrid({ initialShowHidden = false, hiddenOnly = fal
   const scroller = () => document.querySelector<HTMLElement>("main.custom-scroll");
 
   function openPerson(id: number) {
-    scrollPos.current = scroller()?.scrollTop ?? 0;
+    const el = scroller();
+    scrollPos.current = el && el.scrollTop > 0 ? el.scrollTop : window.scrollY;
     setOpenId(id);
   }
 
   useLayoutEffect(() => {
+    const target = openId === null ? scrollPos.current : 0;
     const el = scroller();
-    if (!el) return;
-    el.scrollTop = openId === null ? scrollPos.current : 0;
+    if (el) el.scrollTop = target;
+    window.scrollTo(0, target);
   }, [openId]);
 
   const load = useCallback(() => {
     setLoading(true);
     getPersons(hiddenOnly ? true : showHidden)
       .then((p) => {
-        setPersons(hiddenOnly ? p.filter((x) => x.hidden) : p);
+        const list = hiddenOnly ? p.filter((x) => x.hidden) : p;
+        // Named people first (stable — keeps the existing face-count order within each group).
+        setPersons([...list].sort((a, b) => (a.name ? 0 : 1) - (b.name ? 0 : 1)));
         setError(null);
       })
       .catch((e) => setError(e instanceof Error ? e.message : String(e)))

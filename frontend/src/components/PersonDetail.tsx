@@ -112,7 +112,7 @@ export default function PersonDetail({ personId, onBack, onChanged }: Props) {
 
   return (
     <div className="flex-1 bg-darkroom-glow relative p-margin-md lg:p-margin-lg pb-32">
-      <div className="max-w-[1140px] mx-auto space-y-space-xl">
+      <div className="w-full space-y-space-xl">
         {/* Sub-nav header */}
         <div className="flex items-center justify-between flex-wrap gap-space-md">
           <button

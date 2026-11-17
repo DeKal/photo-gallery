@@ -54,7 +54,7 @@ export default function Lightbox({ ids, index, onIndexChange, onClose, actionLab
     <div
       data-testid="lightbox"
       onClick={onClose}
-      className="fixed inset-0 z-[100] flex items-center justify-center p-8 bg-[#0b0d12]/90 backdrop-blur-lg cursor-zoom-out"
+      className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-[#0b0d12]/90 backdrop-blur-lg cursor-zoom-out"
     >
       <button
         aria-label="Close"
@@ -94,14 +94,14 @@ export default function Lightbox({ ids, index, onIndexChange, onClose, actionLab
       )}
 
       <div className="relative flex flex-col items-center cursor-default" onClick={(e) => e.stopPropagation()}>
-        <div className="relative">
+        <div className="relative h-[86vh] flex items-center justify-center">
           {/* Instant low-res thumbnail underneath (blurred until full loads). */}
           <img
             key={`thumb-${id}`}
             src={thumbUrl(id)}
             alt=""
             aria-hidden="true"
-            className={`max-w-[min(94vw,1400px)] max-h-[82vh] object-contain rounded-xl transition-opacity duration-200 ${
+            className={`h-full w-auto max-w-[94vw] object-contain rounded-xl transition-opacity duration-200 ${
               loaded ? "opacity-0" : "opacity-100 blur-[6px]"
             }`}
           />
