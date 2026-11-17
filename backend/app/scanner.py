@@ -74,7 +74,7 @@ def load_image(path: str | Path) -> Image.Image:
 def make_thumbnail(
     path: str | Path,
     out_dir: str | Path,
-    size: int = 256,
+    size: int = 512,
     sha256: str | None = None,
 ) -> Path:
     """Render a cached ``<sha256>.jpg`` thumbnail for ``path`` into ``out_dir``.
@@ -92,8 +92,8 @@ def make_thumbnail(
 
     out_dir.mkdir(parents=True, exist_ok=True)
     img = load_image(path)
-    img.thumbnail((size, size))
-    img.save(thumb_path, format="JPEG")
+    img.thumbnail((size, size), Image.LANCZOS)
+    img.save(thumb_path, format="JPEG", quality=88)
     return thumb_path
 
 
@@ -103,17 +103,17 @@ def make_face_thumbnail(
     out_dir: str | Path,
     face_key: int | str,
     size: int = 256,
-    margin: float = 0.4,
+    margin: float = 0.45,
 ) -> Path:
     """Render a cropped, square face thumbnail into ``out_dir/faces``.
 
-    Crops ``image`` to ``bbox`` (``[x1, y1, x2, y2]``) expanded by ``margin``
-    (fraction of the box's width/height) on every side, clamped to the image
-    bounds, then padded to a square and resized so its largest dimension is at
-    most ``size``. Saved as JPEG at ``faces/<face_key>.jpg`` and returned.
-
-    Overwrites any existing file so a re-crop (e.g. after a bbox fix) refreshes
-    the cache.
+    Takes a *square* region from ``image`` centred on the face ``bbox``
+    (``[x1, y1, x2, y2]``), sized to the larger box side expanded by ``margin``
+    on each side, with a little extra headroom so hair/chin are not clipped.
+    The square is shifted (not shrunk) to stay inside the image, so the crop is
+    filled with real pixels rather than black padding, then resized to ``size``.
+    Saved as JPEG at ``faces/<face_key>.jpg`` and returned (overwriting any
+    existing file so a re-crop refreshes the cache).
     """
     faces_dir = Path(out_dir) / "faces"
     faces_dir.mkdir(parents=True, exist_ok=True)
@@ -121,7 +121,6 @@ def make_face_thumbnail(
     img = image.convert("RGB")
     w, h = img.size
     x1, y1, x2, y2 = (float(v) for v in bbox)
-    # Normalize ordering in case a bbox arrives with swapped corners.
     if x2 < x1:
         x1, x2 = x2, x1
     if y2 < y1:
@@ -129,28 +128,31 @@ def make_face_thumbnail(
 
     bw = x2 - x1
     bh = y2 - y1
-    mx = bw * margin
-    my = bh * margin
-    left = int(max(0, round(x1 - mx)))
-    top = int(max(0, round(y1 - my)))
-    right = int(min(w, round(x2 + mx)))
-    bottom = int(min(h, round(y2 + my)))
-    # Guard against degenerate boxes (zero/negative area after clamping).
-    if right <= left:
-        right = min(w, left + 1)
-    if bottom <= top:
-        bottom = min(h, top + 1)
+    cx = (x1 + x2) / 2.0
+    # Bias the centre up a little for natural headroom above the face.
+    cy = (y1 + y2) / 2.0 - bh * 0.1
 
-    crop = img.crop((left, top, right, bottom))
+    # Square side = larger box dimension plus margin on both sides, capped to
+    # what the image can actually provide.
+    side = max(bw, bh) * (1.0 + 2.0 * margin)
+    side = min(side, float(w), float(h))
+    if side < 1.0:
+        side = 1.0
 
-    # Pad to a centered square so faces are not distorted by the resize.
-    cw, ch = crop.size
-    side = max(cw, ch)
-    square = Image.new("RGB", (side, side), (0, 0, 0))
-    square.paste(crop, ((side - cw) // 2, (side - ch) // 2))
-    if side > size:
-        square = square.resize((size, size), Image.LANCZOS)
+    half = side / 2.0
+    left = cx - half
+    top = cy - half
+    # Shift the window so it stays fully inside the image (keeps it filled).
+    left = max(0.0, min(left, w - side))
+    top = max(0.0, min(top, h - side))
+
+    il, it = int(round(left)), int(round(top))
+    iside = int(round(side))
+    crop = img.crop((il, it, min(w, il + iside), min(h, it + iside)))
+
+    if crop.width > size or crop.height > size:
+        crop = crop.resize((size, size), Image.LANCZOS)
 
     thumb_path = faces_dir / f"{face_key}.jpg"
-    square.save(thumb_path, format="JPEG")
+    crop.save(thumb_path, format="JPEG", quality=88)
     return thumb_path

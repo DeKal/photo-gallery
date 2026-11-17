@@ -5,10 +5,12 @@ import {
   renamePerson,
   faceThumbUrl,
   thumbUrl,
+  imageUrl,
   type Person,
   type Photo,
 } from "../api";
 import ImgWithFallback from "./ImgWithFallback";
+import Lightbox from "./Lightbox";
 
 interface Props {
   personId: number;
@@ -43,6 +45,7 @@ export default function PersonDetail({ personId, onBack, onChanged }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [name, setName] = useState("");
   const [saving, setSaving] = useState(false);
+  const [lightbox, setLightbox] = useState<number | null>(null);
 
   useEffect(() => {
     setLoading(true);
@@ -135,15 +138,29 @@ export default function PersonDetail({ personId, onBack, onChanged }: Props) {
 
       <div className="grid">
         {photos.map((photo) => (
-          <ImgWithFallback
+          <div
             key={photo.id}
-            className="thumb"
-            sources={[thumbUrl(photo.id)]}
-            alt={photo.path}
-            placeholder={photoPlaceholder}
-          />
+            className="photo-tile"
+            data-testid="person-photo"
+            onClick={() => setLightbox(photo.id)}
+          >
+            <ImgWithFallback
+              className="thumb"
+              sources={[thumbUrl(photo.id)]}
+              alt={photo.path}
+              placeholder={photoPlaceholder}
+            />
+          </div>
         ))}
       </div>
+
+      {lightbox != null && (
+        <Lightbox
+          src={imageUrl(lightbox)}
+          alt={`Photo ${lightbox}`}
+          onClose={() => setLightbox(null)}
+        />
+      )}
     </div>
   );
 }
