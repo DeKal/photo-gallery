@@ -12,6 +12,14 @@ export default function App() {
   const [refreshKey, setRefreshKey] = useState(0);
   const [scanPath, setScanPath] = useState("");
   const [counts, setCounts] = useState<Counts>({ all: null, people: null, similar: null, hidden: null });
+  // Person to auto-open in the People view (e.g. clicked from All Photos). The
+  // nonce lets the same person be re-focused after you navigate away and back.
+  const [focus, setFocus] = useState<{ id: number; n: number } | null>(null);
+
+  const openPerson = (id: number) => {
+    setFocus((f) => ({ id, n: (f?.n ?? 0) + 1 }));
+    setNav("people");
+  };
 
   useEffect(() => {
     getPersons(false)
@@ -106,10 +114,15 @@ export default function App() {
       )}
 
       {(nav === "people" || nav === "hidden") && (
-        <PeopleGrid key={`people-${nav}-${refreshKey}`} initialShowHidden={nav === "hidden"} hiddenOnly={nav === "hidden"} />
+        <PeopleGrid
+          key={`people-${nav}-${refreshKey}`}
+          initialShowHidden={nav === "hidden"}
+          hiddenOnly={nav === "hidden"}
+          focus={nav === "people" ? focus : null}
+        />
       )}
       {nav === "similar" && <SimilarGrid key={`similar-${refreshKey}`} />}
-      {nav === "all" && <AllPhotosGrid key={`all-${refreshKey}`} />}
+      {nav === "all" && <AllPhotosGrid key={`all-${refreshKey}`} onOpenPerson={openPerson} />}
     </AppShell>
   );
 }

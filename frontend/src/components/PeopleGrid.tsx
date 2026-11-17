@@ -16,9 +16,11 @@ const personPlaceholder = (
 interface Props {
   initialShowHidden?: boolean;
   hiddenOnly?: boolean;
+  // Auto-open this person (focused from another view). Nonce re-triggers.
+  focus?: { id: number; n: number } | null;
 }
 
-export default function PeopleGrid({ initialShowHidden = false, hiddenOnly = false }: Props) {
+export default function PeopleGrid({ initialShowHidden = false, hiddenOnly = false, focus = null }: Props) {
   const [persons, setPersons] = useState<Person[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -30,6 +32,7 @@ export default function PeopleGrid({ initialShowHidden = false, hiddenOnly = fal
   const [merging, setMerging] = useState(false);
   const [busy, setBusy] = useState<Set<number>>(new Set());
   const [density, setDensity] = useState<"comfortable" | "compact">("comfortable");
+  const [query, setQuery] = useState("");
   // Remember the gallery scroll position so returning from a person restores it.
   const scrollPos = useRef(0);
 
@@ -64,6 +67,11 @@ export default function PeopleGrid({ initialShowHidden = false, hiddenOnly = fal
   useEffect(() => {
     load();
   }, [load]);
+
+  // Open a person requested from another view (All Photos chip, etc.).
+  useEffect(() => {
+    if (focus) setOpenId(focus.id);
+  }, [focus]);
 
   function toggle(id: number) {
     setSelected((prev) => {
@@ -116,6 +124,15 @@ export default function PeopleGrid({ initialShowHidden = false, hiddenOnly = fal
     return <PersonDetail personId={openId} onBack={() => setOpenId(null)} onChanged={load} />;
   }
 
+  const q = query.trim().toLowerCase();
+  const visible = q
+    ? persons.filter((p) =>
+        p.name
+          ? p.name.toLowerCase().includes(q)
+          : `person ${p.id}`.includes(q) || String(p.id).includes(q)
+      )
+    : persons;
+
   return (
     <>
       {/* GALLERY CONTROLS & STATS BAR */}
@@ -141,11 +158,28 @@ export default function PeopleGrid({ initialShowHidden = false, hiddenOnly = fal
             </>
           )}
           <span className="text-body-sm font-body-sm text-outline">
-            Showing <strong className="text-on-surface font-semibold">{persons.length} {hiddenOnly ? "hidden" : persons.length === 1 ? "subject" : "identified subjects"}</strong>
+            Showing <strong className="text-on-surface font-semibold">{visible.length} {hiddenOnly ? "hidden" : visible.length === 1 ? "subject" : "identified subjects"}</strong>
+            {q && persons.length !== visible.length ? <span className="text-outline"> of {persons.length}</span> : null}
           </span>
         </div>
 
         <div className="flex items-center gap-space-sm">
+          <div className="flex items-center bg-[#171922] border border-[#232736] rounded-xl px-3 h-9 focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-500/20 transition-all">
+            <Icon name="search" className="text-outline text-base mr-1.5" />
+            <input
+              type="text"
+              data-testid="people-search"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Filter by name…"
+              className="w-36 sm:w-48 bg-transparent text-on-surface text-label-md font-label-md outline-none border-none p-0 focus:ring-0 placeholder:text-outline"
+            />
+            {query && (
+              <button className="ml-1 text-outline hover:text-on-surface" title="Clear filter" onClick={() => setQuery("")}>
+                <Icon name="close" className="text-sm" />
+              </button>
+            )}
+          </div>
           {!hiddenOnly && (
             <label className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#171922] border border-[#232736] cursor-pointer hover:border-outline-variant">
               <input className="sr-only peer" type="checkbox" checked={showHidden} onChange={() => setShowHidden((v) => !v)} />
@@ -196,6 +230,9 @@ export default function PeopleGrid({ initialShowHidden = false, hiddenOnly = fal
             {hiddenOnly ? "No hidden people." : "No people yet. Scan a folder to get started."}
           </div>
         )}
+        {!loading && persons.length > 0 && visible.length === 0 && (
+          <div className="text-outline py-12 text-center">No people match “{query}”.</div>
+        )}
 
         <div
           className={`grid gap-space-lg ${
@@ -204,7 +241,7 @@ export default function PeopleGrid({ initialShowHidden = false, hiddenOnly = fal
               : "grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 2xl:grid-cols-7"
           }`}
         >
-          {persons.map((p) => {
+          {visible.map((p) => {
             const isSel = selected.has(p.id);
             const unnamed = !p.name;
             return (

@@ -8,6 +8,10 @@ interface Props {
   index: number;
   onIndexChange: (i: number) => void;
   onClose: () => void;
+  // Optional per-photo people tags: faces detected + persons present.
+  meta?: Record<number, { faces: number; persons: { id: number; name: string | null }[] }>;
+  // Click a person tag to open that person.
+  onOpenPerson?: (id: number) => void;
   // Optional action button (e.g. "More like this") shown over the image.
   actionLabel?: string;
   onAction?: (id: number) => void;
@@ -15,11 +19,12 @@ interface Props {
 
 // Full-screen overlay showing one image at full resolution with prev/next
 // navigation. Click the backdrop or press Escape to dismiss; ←/→ to page.
-export default function Lightbox({ ids, index, onIndexChange, onClose, actionLabel, onAction }: Props) {
+export default function Lightbox({ ids, index, onIndexChange, onClose, meta, onOpenPerson, actionLabel, onAction }: Props) {
   const count = ids.length;
   const id = ids[index];
   const hasPrev = index > 0;
   const hasNext = index < count - 1;
+  const m = meta?.[id];
 
   // Full-res photos are large, so the previous frame lingers while the next
   // one downloads. Show a thumbnail instantly + a spinner until the full image
@@ -122,19 +127,43 @@ export default function Lightbox({ ids, index, onIndexChange, onClose, actionLab
             </div>
           )}
         </div>
-        <div className="mt-4 flex items-center gap-4">
-          <span className="text-body-sm font-body-sm text-outline tabular-nums">
-            {index + 1} / {count}
-          </span>
-          {actionLabel && onAction && (
-            <button
-              data-testid="lightbox-action"
-              onClick={() => onAction(id)}
-              className="px-space-lg py-2 rounded-full bg-gradient-to-r from-indigo-500 to-violet-600 hover:opacity-90 text-white font-label-md text-label-md shadow-lg shadow-indigo-500/30 active:scale-[0.98] transition-all flex items-center gap-2"
-            >
-              <Icon name="auto_awesome" className="text-base" />
-              {actionLabel}
-            </button>
+        <div className="mt-4 flex flex-col items-center gap-3">
+          <div className="flex items-center gap-4">
+            <span className="text-body-sm font-body-sm text-outline tabular-nums">
+              {index + 1} / {count}
+            </span>
+            {m && (
+              <span className="text-body-sm font-body-sm text-outline">
+                {m.faces} {m.faces === 1 ? "face" : "faces"} · {m.persons.length} {m.persons.length === 1 ? "person" : "people"}
+              </span>
+            )}
+            {actionLabel && onAction && (
+              <button
+                data-testid="lightbox-action"
+                onClick={() => onAction(id)}
+                className="px-space-lg py-2 rounded-full bg-gradient-to-r from-indigo-500 to-violet-600 hover:opacity-90 text-white font-label-md text-label-md shadow-lg shadow-indigo-500/30 active:scale-[0.98] transition-all flex items-center gap-2"
+              >
+                <Icon name="auto_awesome" className="text-base" />
+                {actionLabel}
+              </button>
+            )}
+          </div>
+          {m && m.persons.length > 0 && (
+            <div className="flex flex-wrap items-center justify-center gap-2 max-w-[90vw]">
+              {m.persons.map((pp) => (
+                <button
+                  key={pp.id}
+                  data-testid="lightbox-person"
+                  onClick={() => onOpenPerson?.(pp.id)}
+                  disabled={!onOpenPerson}
+                  title={`Open ${pp.name ?? `Person ${pp.id}`}`}
+                  className="flex items-center gap-1.5 pl-2 pr-3 py-1 rounded-full bg-[#171922]/90 border border-white/10 hover:border-indigo-400 text-on-surface hover:text-white text-label-md font-label-md transition-colors disabled:cursor-default"
+                >
+                  <Icon name={pp.name ? "person" : "person_outline"} className="text-[16px] text-primary" />
+                  {pp.name ?? `Person ${pp.id}`}
+                </button>
+              ))}
+            </div>
           )}
         </div>
       </div>

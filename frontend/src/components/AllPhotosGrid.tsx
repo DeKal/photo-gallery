@@ -28,18 +28,19 @@ function monthLabel(takenAt: string | null): string {
   return d.toLocaleDateString(undefined, { month: "long", year: "numeric" });
 }
 
-export default function AllPhotosGrid() {
+export default function AllPhotosGrid({ onOpenPerson }: { onOpenPerson?: (id: number) => void }) {
   const [items, setItems] = useState<PhotoListItem[]>([]);
   const [total, setTotal] = useState(0);
   const [order, setOrder] = useState<PhotoOrder>("newest");
   const [query, setQuery] = useState("");
+  const [debounced, setDebounced] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lightbox, setLightbox] = useState<number | null>(null);
 
-  const loadPage = useCallback((offset: number, ord: PhotoOrder, replace: boolean) => {
+  const loadPage = useCallback((offset: number, ord: PhotoOrder, q: string, replace: boolean) => {
     setLoading(true);
-    getPhotos(PAGE, offset, ord)
+    getPhotos(PAGE, offset, ord, q)
       .then((page) => {
         setTotal(page.total);
         setItems((prev) => (replace ? page.items : [...prev, ...page.items]));
@@ -49,29 +50,30 @@ export default function AllPhotosGrid() {
       .finally(() => setLoading(false));
   }, []);
 
+  // Debounce the search box so each keystroke doesn't hit the API.
+  useEffect(() => {
+    const t = setTimeout(() => setDebounced(query), 250);
+    return () => clearTimeout(t);
+  }, [query]);
+
   useEffect(() => {
     setItems([]);
-    loadPage(0, order, true);
-  }, [order, loadPage]);
-
-  const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    return q ? items.filter((p) => p.path.toLowerCase().includes(q)) : items;
-  }, [items, query]);
+    loadPage(0, order, debounced, true);
+  }, [order, debounced, loadPage]);
 
   const groups = useMemo(() => {
     const out: { label: string; photos: PhotoListItem[] }[] = [];
-    for (const p of filtered) {
+    for (const p of items) {
       const label = monthLabel(p.taken_at);
       const last = out[out.length - 1];
       if (last && last.label === label) last.photos.push(p);
       else out.push({ label, photos: [p] });
     }
     return out;
-  }, [filtered]);
+  }, [items]);
 
-  const hasMore = items.length < total && !query;
-  const ids = filtered.map((p) => p.id);
+  const hasMore = items.length < total;
+  const ids = items.map((p) => p.id);
 
   return (
     <section className="flex flex-col flex-1">
@@ -91,7 +93,7 @@ export default function AllPhotosGrid() {
               type="text"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search loaded photos by path…"
+              placeholder="Search by person name or file path…"
               className="w-full h-11 pl-9 pr-9 text-body-sm font-body-sm bg-surface-container border border-outline-variant/60 rounded-xl text-on-surface placeholder:text-outline focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all"
             />
             {query && (
@@ -118,9 +120,9 @@ export default function AllPhotosGrid() {
             {error}
           </div>
         )}
-        {!loading && filtered.length === 0 && (
+        {!loading && items.length === 0 && (
           <div className="text-outline py-12 text-center">
-            {query ? "No loaded photos match that path." : "No photos yet. Scan a folder to get started."}
+            {debounced ? `No photos match “${debounced}”.` : "No photos yet. Scan a folder to get started."}
           </div>
         )}
 
@@ -146,9 +148,40 @@ export default function AllPhotosGrid() {
                     alt={p.path}
                     placeholder={photoPlaceholder}
                   />
-                  <div className="absolute inset-x-0 bottom-0 p-2 bg-gradient-to-t from-surface-dim/90 via-surface-dim/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-between text-[14px] font-mono text-on-surface">
-                    <span className="truncate">{basename(p.path)}</span>
-                    {p.width && p.height && <span className="text-primary font-sans shrink-0 ml-1">{p.width}×{p.height}</span>}
+                  {p.face_count > 0 && (
+                    <span
+                      title={`${p.face_count} ${p.face_count === 1 ? "face" : "faces"} detected · ${p.person_count} ${p.person_count === 1 ? "person" : "people"} clustered`}
+                      className="absolute top-2 left-2 flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#0b0d12]/75 backdrop-blur-md border border-white/10 text-white text-label-sm font-label-sm shadow-sm"
+                    >
+                      <Icon name="group" className="text-[13px]" />
+                      {p.person_count > 0 && p.person_count !== p.face_count
+                        ? `${p.person_count}/${p.face_count}`
+                        : p.face_count}
+                    </span>
+                  )}
+                  <div className="absolute inset-x-0 bottom-0 p-2 bg-gradient-to-t from-surface-dim/95 via-surface-dim/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex flex-col gap-1.5">
+                    {p.persons.length > 0 && (
+                      <div className="flex flex-wrap gap-1">
+                        {p.persons.map((pp) => (
+                          <button
+                            key={pp.id}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onOpenPerson?.(pp.id);
+                            }}
+                            title={`Open ${pp.name ?? `Person ${pp.id}`}`}
+                            className="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-indigo-500/90 hover:bg-indigo-400 text-white text-[11px] font-medium shadow-sm transition-colors max-w-full"
+                          >
+                            <Icon name={pp.name ? "person" : "person_outline"} className="text-[12px] shrink-0" />
+                            <span className="truncate">{pp.name ?? `Person ${pp.id}`}</span>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    <div className="flex items-center justify-between text-[14px] font-mono text-on-surface">
+                      <span className="truncate">{basename(p.path)}</span>
+                      {p.width && p.height && <span className="text-primary font-sans shrink-0 ml-1">{p.width}×{p.height}</span>}
+                    </div>
                   </div>
                 </div>
               ))}
@@ -159,7 +192,7 @@ export default function AllPhotosGrid() {
         {hasMore && (
           <div className="flex justify-center pt-2">
             <button
-              onClick={() => loadPage(items.length, order, false)}
+              onClick={() => loadPage(items.length, order, debounced, false)}
               disabled={loading}
               className="px-space-lg py-2 rounded-xl bg-surface-container border border-outline-variant hover:border-primary text-on-surface text-label-md font-label-md flex items-center gap-2 transition-colors disabled:opacity-45"
             >
@@ -172,7 +205,21 @@ export default function AllPhotosGrid() {
       </div>
 
       {lightbox != null && (
-        <Lightbox ids={ids} index={lightbox} onIndexChange={setLightbox} onClose={() => setLightbox(null)} />
+        <Lightbox
+          ids={ids}
+          index={lightbox}
+          onIndexChange={setLightbox}
+          onClose={() => setLightbox(null)}
+          meta={Object.fromEntries(items.map((p) => [p.id, { faces: p.face_count, persons: p.persons }]))}
+          onOpenPerson={
+            onOpenPerson
+              ? (pid) => {
+                  setLightbox(null);
+                  onOpenPerson(pid);
+                }
+              : undefined
+          }
+        />
       )}
     </section>
   );

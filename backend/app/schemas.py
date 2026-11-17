@@ -49,6 +49,13 @@ class PhotoOut(BaseModel):
     thumb_path: Optional[str] = None
 
 
+class PhotoPerson(BaseModel):
+    """A person present in a photo, for cross-check tags that link out."""
+
+    id: int
+    name: Optional[str] = None
+
+
 class PhotoListItem(BaseModel):
     """A photo in the flat All-Photos library listing, with light EXIF."""
 
@@ -60,6 +67,10 @@ class PhotoListItem(BaseModel):
     width: Optional[int] = None
     height: Optional[int] = None
     taken_at: Optional[datetime] = None
+    # Cross-check tags: faces detected, and the persons they clustered into.
+    face_count: int = 0
+    person_count: int = 0
+    persons: list[PhotoPerson] = []
 
 
 class PhotoListOut(BaseModel):

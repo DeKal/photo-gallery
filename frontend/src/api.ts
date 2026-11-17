@@ -190,6 +190,11 @@ export function getSimilar(photoId: number, k = 50): Promise<SimilarPhoto[]> {
 
 // ---- All Photos (flat library) ------------------------------------------
 
+export interface PhotoPerson {
+  id: number;
+  name: string | null;
+}
+
 export interface PhotoListItem {
   id: number;
   path: string;
@@ -197,6 +202,9 @@ export interface PhotoListItem {
   width: number | null;
   height: number | null;
   taken_at: string | null;
+  face_count: number;
+  person_count: number;
+  persons: PhotoPerson[];
 }
 
 export interface PhotoListPage {
@@ -210,6 +218,8 @@ export function getPhotos(
   limit = 120,
   offset = 0,
   order: PhotoOrder = "newest",
+  q = "",
 ): Promise<PhotoListPage> {
-  return request(`/photos?limit=${limit}&offset=${offset}&order=${order}`);
+  const qs = q.trim() ? `&q=${encodeURIComponent(q.trim())}` : "";
+  return request(`/photos?limit=${limit}&offset=${offset}&order=${order}${qs}`);
 }
