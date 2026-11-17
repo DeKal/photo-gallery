@@ -79,6 +79,41 @@ def list_persons(
     return out
 
 
+@router.get("/persons/export")
+def export_persons(
+    include_hidden: bool = False, session: Session = Depends(get_session)
+) -> list[dict[str, object]]:
+    """Export the person groups as JSON: each person with their photo paths.
+
+    Declared before ``/persons/{person_id}`` so the literal path wins the match.
+    """
+    stmt = (
+        select(Person.id, Person.name, Photo.id, Photo.path)
+        .join(FacePerson, FacePerson.person_id == Person.id)
+        .join(Face, Face.id == FacePerson.face_id)
+        .join(Photo, Photo.id == Face.photo_id)
+        .distinct()
+        .order_by(Person.id, Photo.id)
+    )
+    if not include_hidden:
+        stmt = stmt.where(Person.hidden.is_(False))
+
+    groups: dict[int, dict[str, object]] = {}
+    for person_id, name, photo_id, path in session.execute(stmt):
+        g = groups.get(person_id)
+        if g is None:
+            g = {"id": person_id, "name": name, "photos": []}
+            groups[person_id] = g
+        g["photos"].append({"id": photo_id, "path": path})  # type: ignore[attr-defined]
+
+    out = list(groups.values())
+    for g in out:
+        g["photo_count"] = len(g["photos"])  # type: ignore[arg-type]
+    # Named groups first, then larger groups.
+    out.sort(key=lambda g: (g["name"] is None, -len(g["photos"])))  # type: ignore[arg-type]
+    return out
+
+
 def _set_hidden(session: Session, person_id: int, hidden: bool) -> PersonOut:
     person = session.get(Person, person_id)
     if person is None:

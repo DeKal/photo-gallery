@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { getPersons, mergePersons, hidePerson, unhidePerson, faceThumbUrl, thumbUrl, type Person } from "../api";
+import { getPersons, mergePersons, hidePerson, unhidePerson, exportPersons, faceThumbUrl, thumbUrl, type Person } from "../api";
 import ImgWithFallback from "./ImgWithFallback";
 import PersonDetail from "./PersonDetail";
 import Icon from "./Icon";
@@ -42,6 +42,7 @@ export default function PeopleGrid({
   const [busy, setBusy] = useState<Set<number>>(new Set());
   const [density, setDensity] = useState<"comfortable" | "compact">("comfortable");
   const [query, setQuery] = useState("");
+  const [exporting, setExporting] = useState(false);
   // Remember the gallery scroll position so returning from a person restores it.
   const scrollPos = useRef(0);
 
@@ -107,6 +108,24 @@ export default function PeopleGrid({
       setError(e instanceof Error ? e.message : String(e));
     } finally {
       setMerging(false);
+    }
+  }
+
+  async function doExport() {
+    setExporting(true);
+    try {
+      const groups = await exportPersons(hiddenOnly);
+      const blob = new Blob([JSON.stringify(groups, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "photocluster-groups.json";
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setExporting(false);
     }
   }
 
@@ -361,26 +380,22 @@ export default function PeopleGrid({
       ) : (
         !selectMode &&
         persons.length > 0 && (
-          <aside className="fixed bottom-6 left-1/2 -translate-x-1/2 z-30 flex items-center gap-space-md px-space-xl py-space-sm bg-[#171922]/90 backdrop-blur-xl border border-white/10 rounded-full shadow-2xl shadow-black/80 ring-1 ring-white/5">
-            <div className="flex items-center gap-2 border-r border-[#232736] pr-space-lg">
-              <div className="w-2.5 h-2.5 rounded-full bg-indigo-400 animate-ping" />
-              <p className="text-label-md font-label-md text-on-surface">
-                {persons.length} {persons.length === 1 ? "cluster" : "clusters"} generated <span className="text-tertiary font-semibold">on-device</span>
-              </p>
-            </div>
-            <div className="flex items-center gap-space-sm">
-              <button
-                onClick={() => setSelectMode(true)}
-                className="px-space-md py-1.5 rounded-xl bg-surface-container-high hover:bg-surface-variant text-on-surface border border-outline-variant text-label-md font-label-md active:scale-[0.98] transition-all flex items-center gap-1.5"
-              >
-                <Icon name="call_merge" className="text-base" />
-                Merge Similar
-              </button>
-              <button className="px-space-lg py-1.5 rounded-xl bg-gradient-to-r from-indigo-500 to-violet-600 hover:opacity-90 text-white font-label-md text-label-md shadow-md shadow-indigo-500/25 active:scale-[0.98] transition-all flex items-center gap-1.5">
-                <Icon name="file_upload" className="text-base" />
-                Export Groups
-              </button>
-            </div>
+          <aside className="fixed bottom-6 left-1/2 -translate-x-1/2 z-30 flex items-center gap-space-sm px-space-lg py-space-sm bg-[#171922]/90 backdrop-blur-xl border border-white/10 rounded-full shadow-2xl shadow-black/80 ring-1 ring-white/5">
+            <button
+              onClick={() => setSelectMode(true)}
+              className="px-space-md py-1.5 rounded-xl bg-surface-container-high hover:bg-surface-variant text-on-surface border border-outline-variant text-label-md font-label-md active:scale-[0.98] transition-all flex items-center gap-1.5"
+            >
+              <Icon name="call_merge" className="text-base" />
+              Merge Similar
+            </button>
+            <button
+              onClick={() => void doExport()}
+              disabled={exporting}
+              className="px-space-lg py-1.5 rounded-xl bg-gradient-to-r from-indigo-500 to-violet-600 hover:opacity-90 text-white font-label-md text-label-md shadow-md shadow-indigo-500/25 active:scale-[0.98] transition-all flex items-center gap-1.5 disabled:opacity-60"
+            >
+              <Icon name={exporting ? "progress_activity" : "file_upload"} className={`text-base ${exporting ? "animate-spin" : ""}`} />
+              {exporting ? "Exporting…" : "Export Groups"}
+            </button>
           </aside>
         )
       )}
