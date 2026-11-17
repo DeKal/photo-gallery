@@ -53,6 +53,12 @@ class Person(Base):
     hidden: Mapped[bool] = mapped_column(
         Boolean, nullable=False, default=False, server_default="false"
     )
+    # True once the user has curated this person (rename / merge / hide / move /
+    # set-cover). Locked persons are preserved verbatim across re-clustering
+    # instead of being rebuilt from scratch, so manual edits survive a rescan.
+    locked: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="false"
+    )
 
 
 class FacePerson(Base):

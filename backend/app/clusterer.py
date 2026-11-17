@@ -4,9 +4,11 @@ Two entry points run on demand (see ``POST /cluster``):
 
 - :func:`cluster_faces` groups ArcFace face vectors into *persons* with DBSCAN.
   It filters out weak/tiny detections first (they pollute clusters), then runs
-  DBSCAN tuned for ArcFace cosine distance. It preserves user-named persons
-  across re-runs by matching new cluster centroids to the centroids of existing
-  named persons (cosine similarity).
+  DBSCAN tuned for ArcFace cosine distance. **Locked** persons (those the user
+  has curated: renamed, merged, hidden, moved faces into, or picked a cover for)
+  are preserved verbatim across re-runs: their face assignments are never
+  rebuilt, and new faces that clearly match a locked person's centroid are
+  absorbed into it. Only un-locked, auto-generated clusters are rebuilt.
 - :func:`cluster_images` groups CLIP image vectors into visual *sim_clusters*
   with HDBSCAN. These carry no user state, so they are wiped and rebuilt each
   run.
@@ -28,6 +30,7 @@ from __future__ import annotations
 import logging
 
 import numpy as np
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.models import (
@@ -43,8 +46,6 @@ logger = logging.getLogger(__name__)
 
 MIN_CLUSTER_SIZE = 3
 MIN_SAMPLES = 1
-# Cosine similarity threshold for reusing an existing named person's identity.
-NAME_MATCH_THRESHOLD = 0.5
 
 # --- Face clustering (DBSCAN) tuning --------------------------------------
 # Max cosine distance between two faces of the *same* person. ArcFace normed
@@ -164,86 +165,114 @@ def _centroid(vecs: np.ndarray) -> np.ndarray:
 
 
 def cluster_faces(session: Session) -> dict:
-    """Cluster face vectors into persons; preserve named persons across runs.
+    """Cluster face vectors into persons; preserve locked (curated) persons.
 
     Weak detections (low ``det_score`` or tiny bbox) are excluded from the
     clustering step and left unassigned, so they do not pollute clusters.
 
+    Locked persons keep their existing face assignments untouched; un-pinned
+    faces that clearly match a locked person's centroid are absorbed into it,
+    and the rest are grouped into fresh auto persons with DBSCAN. Only un-locked
+    auto persons are rebuilt from scratch.
+
     Returns ``{"faces": N, "clustered": C, "persons": K, "noise": M}`` where
-    ``N`` is all faces, ``C`` the strong faces fed to DBSCAN, ``K`` the number
-    of person clusters and ``M`` the unassigned faces (weak + DBSCAN noise).
+    ``N`` is all faces, ``C`` the strong faces considered, ``K`` the total
+    persons afterwards and ``M`` the faces left unassigned.
     """
     all_faces, _ = _load_faces(session)
     n = len(all_faces)
 
     # Keep only confident, reasonably-sized faces for clustering.
     strong_faces = [f for f in all_faces if _is_strong_face(f)]
-    filtered_out = n - len(strong_faces)
 
-    # Not enough points for a cluster: everything is unassigned (noise).
-    if len(strong_faces) < FACE_MIN_SAMPLES:
-        session.query(FacePerson).delete()
-        _drop_orphan_auto_persons(session)
-        session.commit()
-        return {"faces": n, "clustered": len(strong_faces), "persons": 0, "noise": n}
+    # Faces already pinned to a locked (user-curated) person stay put.
+    locked_face_ids = {
+        row
+        for row in session.execute(
+            select(FacePerson.face_id)
+            .join(Person, Person.id == FacePerson.person_id)
+            .where(Person.locked.is_(True))
+        ).scalars()
+    }
 
-    vecs = np.asarray(
-        [np.asarray(f.vec, dtype=np.float32) for f in strong_faces]
+    # Snapshot locked-person centroids before we touch any assignments.
+    locked_centroids = _locked_person_centroids(session)
+
+    # Wipe only the NON-locked assignments; locked ones are preserved verbatim.
+    session.execute(
+        FacePerson.__table__.delete().where(
+            FacePerson.person_id.in_(
+                select(Person.id).where(Person.locked.is_(False))
+            )
+        )
     )
-    labels = _dbscan_labels(vecs)
-
-    # Snapshot existing named-person centroids before we touch assignments, so we
-    # can reuse their identity (and name) for matching new clusters.
-    named_centroids = _named_person_centroids(session)
-
-    # Rebuild all face->person assignments from scratch.
-    session.query(FacePerson).delete()
     session.flush()
 
-    dbscan_noise = int(np.sum(labels == -1))
-    cluster_labels = sorted(int(x) for x in set(labels) if x != -1)
-    reused_person_ids: set[int] = set()
+    # Pool = strong faces not already pinned to a locked person.
+    pool = [f for f in strong_faces if f.id not in locked_face_ids]
 
-    for label in cluster_labels:
-        member_idx = np.where(labels == label)[0]
-        member_faces = [strong_faces[i] for i in member_idx]
-        centroid = _centroid(vecs[member_idx])
+    # Absorb pool faces that clearly match a locked person's centroid.
+    remaining: list[Face] = []
+    if locked_centroids:
+        cids = np.asarray([c for _, c in locked_centroids], dtype=np.float32)
+        pids = [pid for pid, _ in locked_centroids]
+        for face in pool:
+            v = np.asarray(face.vec, dtype=np.float32)
+            norm = np.linalg.norm(v)
+            if norm:
+                v = v / norm
+            sims = cids @ v
+            j = int(np.argmax(sims))
+            if 1.0 - float(sims[j]) <= FACE_EPS:
+                session.add(FacePerson(face_id=face.id, person_id=pids[j]))
+            else:
+                remaining.append(face)
+    else:
+        remaining = pool
 
-        person = _match_named_person(
-            centroid, named_centroids, reused_person_ids
+    # Cluster the leftover faces into fresh (un-locked, unnamed) auto persons.
+    new_persons = 0
+    if len(remaining) >= FACE_MIN_SAMPLES:
+        vecs = np.asarray(
+            [np.asarray(f.vec, dtype=np.float32) for f in remaining]
         )
-        if person is None:
+        labels = _dbscan_labels(vecs)
+        for label in sorted(int(x) for x in set(labels) if x != -1):
+            member_idx = np.where(labels == label)[0]
+            member_faces = [remaining[i] for i in member_idx]
             person = Person(name=None)
             session.add(person)
             session.flush()
-        else:
-            reused_person_ids.add(person.id)
-
-        # Cover face = highest detection score (best, most frontal) in cluster.
-        cover = max(member_faces, key=lambda f: f.det_score)
-        person.cover_face_id = cover.id
-
-        for face in member_faces:
-            session.add(FacePerson(face_id=face.id, person_id=person.id))
+            # Cover face = highest detection score (best, most frontal).
+            cover = max(member_faces, key=lambda f: f.det_score)
+            person.cover_face_id = cover.id
+            for face in member_faces:
+                session.add(FacePerson(face_id=face.id, person_id=person.id))
+            new_persons += 1
 
     session.flush()
     _drop_orphan_auto_persons(session)
     session.commit()
 
-    noise = filtered_out + dbscan_noise
+    assigned = session.execute(
+        select(func.count(func.distinct(FacePerson.face_id)))
+    ).scalar_one()
+    total_persons = session.execute(
+        select(func.count()).select_from(Person)
+    ).scalar_one()
     return {
         "faces": n,
         "clustered": len(strong_faces),
-        "persons": len(cluster_labels),
-        "noise": noise,
+        "persons": int(total_persons),
+        "noise": n - int(assigned),
     }
 
 
-def _named_person_centroids(session: Session) -> list[tuple[Person, np.ndarray]]:
-    """Centroid of each currently-named person, from its assigned face vecs."""
-    result: list[tuple[Person, np.ndarray]] = []
-    named = session.query(Person).filter(Person.name.isnot(None)).all()
-    for person in named:
+def _locked_person_centroids(session: Session) -> list[tuple[int, np.ndarray]]:
+    """``(person_id, centroid)`` for each locked person that still has faces."""
+    result: list[tuple[int, np.ndarray]] = []
+    locked = session.query(Person).filter(Person.locked.is_(True)).all()
+    for person in locked:
         rows = (
             session.query(Face.vec)
             .join(FacePerson, FacePerson.face_id == Face.id)
@@ -253,34 +282,17 @@ def _named_person_centroids(session: Session) -> list[tuple[Person, np.ndarray]]
         if not rows:
             continue
         vecs = np.asarray([np.asarray(r[0], dtype=np.float32) for r in rows])
-        result.append((person, _centroid(vecs)))
+        result.append((person.id, _centroid(vecs)))
     return result
 
 
-def _match_named_person(
-    centroid: np.ndarray,
-    named_centroids: list[tuple[Person, np.ndarray]],
-    already_used: set[int],
-) -> Person | None:
-    """Return the best named person whose centroid is >= threshold, else None.
-
-    Each named person can only be claimed by one new cluster per run.
-    """
-    best: Person | None = None
-    best_sim = NAME_MATCH_THRESHOLD
-    for person, other in named_centroids:
-        if person.id in already_used:
-            continue
-        sim = float(np.dot(centroid, other))
-        if sim >= best_sim:
-            best_sim = sim
-            best = person
-    return best
-
-
 def _drop_orphan_auto_persons(session: Session) -> None:
-    """Delete unnamed persons with no remaining faces. Never deletes named ones."""
-    auto_persons = session.query(Person).filter(Person.name.is_(None)).all()
+    """Delete un-locked, unnamed persons with no faces. Never touches locked ones."""
+    auto_persons = (
+        session.query(Person)
+        .filter(Person.name.is_(None), Person.locked.is_(False))
+        .all()
+    )
     for person in auto_persons:
         has_faces = (
             session.query(FacePerson)

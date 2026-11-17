@@ -84,6 +84,7 @@ def _set_hidden(session: Session, person_id: int, hidden: bool) -> PersonOut:
     if person is None:
         raise HTTPException(status_code=404, detail="person not found")
     person.hidden = hidden
+    person.locked = True  # A hide/unhide is a user decision; preserve it.
     session.commit()
     session.refresh(person)
     return _person_out(session, person)
@@ -192,6 +193,7 @@ def set_person_cover(
         )
 
     person.cover_face_id = body.face_id
+    person.locked = True
     session.commit()
     session.refresh(person)
     return _person_out(session, person)
@@ -209,6 +211,7 @@ def rename_person(
         raise HTTPException(status_code=404, detail="person not found")
 
     person.name = body.name
+    person.locked = True
     session.commit()
     session.refresh(person)
     return _person_out(session, person)
@@ -237,6 +240,9 @@ def merge_persons(
     target_id = body.ids[0]
     target = persons[target_id]
     other_ids = [i for i in body.ids[1:] if i != target_id]
+
+    # A merge is a user decision; lock the result so a rescan won't undo it.
+    target.locked = True
 
     # Reassign faces from the other persons onto the target.
     for other_id in other_ids:
@@ -274,6 +280,9 @@ def move_faces(
         target = Person()
         session.add(target)
         session.flush()
+
+    # Moving faces is a user decision; lock the target so a rescan preserves it.
+    target.locked = True
 
     # Persons that might become empty after moving faces away from them.
     source_ids = {
