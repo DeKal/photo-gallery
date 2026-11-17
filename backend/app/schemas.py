@@ -49,6 +49,26 @@ class PhotoOut(BaseModel):
     thumb_path: Optional[str] = None
 
 
+class PhotoListItem(BaseModel):
+    """A photo in the flat All-Photos library listing, with light EXIF."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    path: str
+    thumb_path: Optional[str] = None
+    width: Optional[int] = None
+    height: Optional[int] = None
+    taken_at: Optional[datetime] = None
+
+
+class PhotoListOut(BaseModel):
+    """A page of the All-Photos listing plus the total matching count."""
+
+    total: int
+    items: list[PhotoListItem]
+
+
 class SimClusterOut(BaseModel):
     """A visual-similarity cluster with a cover photo and member count."""
 

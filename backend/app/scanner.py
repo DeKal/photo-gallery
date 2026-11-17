@@ -12,6 +12,7 @@ HEIC/HEIF support is enabled at import time via ``pillow_heif`` when available.
 from __future__ import annotations
 
 import hashlib
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterator
 
@@ -57,6 +58,40 @@ def file_sha256(path: str | Path) -> str:
         for chunk in iter(lambda: fh.read(_CHUNK_SIZE), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+# EXIF tag ids for capture time (DateTimeOriginal, then DateTime).
+_EXIF_DATETIME_TAGS = (36867, 306)
+
+
+def file_taken_at(path: str | Path) -> datetime | None:
+    """Best-effort capture time for an image, as a timezone-aware UTC datetime.
+
+    Prefers the EXIF capture timestamp (``DateTimeOriginal``, then ``DateTime``,
+    formatted ``YYYY:MM:DD HH:MM:SS``); when no usable EXIF date is present it
+    falls back to the file's last-modified time. Returns ``None`` only if even
+    the filesystem timestamp cannot be read.
+    """
+    try:
+        with Image.open(path) as img:
+            exif = img.getexif()
+        for tag in _EXIF_DATETIME_TAGS:
+            raw = exif.get(tag)
+            if not raw:
+                continue
+            try:
+                dt = datetime.strptime(str(raw).strip(), "%Y:%m:%d %H:%M:%S")
+                return dt.replace(tzinfo=timezone.utc)
+            except ValueError:
+                continue
+    except (UnidentifiedImageError, OSError, ValueError):
+        pass  # Fall through to the filesystem mtime.
+
+    try:
+        mtime = Path(path).stat().st_mtime
+        return datetime.fromtimestamp(mtime, tz=timezone.utc)
+    except OSError:
+        return None
 
 
 def load_image(path: str | Path) -> Image.Image:

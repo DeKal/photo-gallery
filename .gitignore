@@ -10,3 +10,6 @@ frontend/.playwright/
 .pytest_cache/
 *.egg-info/
 graphify-out
+
+# local dev screenshot helper
+frontend/shot.mjs

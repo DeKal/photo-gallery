@@ -14,8 +14,15 @@ class Settings(BaseSettings):
     def model_post_init(self, __context) -> None:
         if self.thumb_dir is None:
             self.thumb_dir = self.data_dir / "thumbs"
-        self.data_dir.mkdir(parents=True, exist_ok=True)
-        self.thumb_dir.mkdir(parents=True, exist_ok=True)
+        # The worker writes thumbnails here; the slim API container never does
+        # and may run on a read-only/ephemeral filesystem. Creating these dirs
+        # is therefore best-effort: a failure must not break import of the
+        # settings (and thus the API), since only the worker actually needs them.
+        for directory in (self.data_dir, self.thumb_dir):
+            try:
+                directory.mkdir(parents=True, exist_ok=True)
+            except OSError:
+                pass
 
 
 settings = Settings()

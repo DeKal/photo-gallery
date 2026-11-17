@@ -20,6 +20,7 @@ from app.models import Face, ImageEmbedding, Photo, Scan
 from app.scanner import (
     UnreadableImageError,
     file_sha256,
+    file_taken_at,
     iter_images,
     load_image,
     make_face_thumbnail,
@@ -94,6 +95,7 @@ def _process_file(session, path) -> None:
         sha256=sha,
         width=width,
         height=height,
+        taken_at=file_taken_at(path),
         thumb_path=str(thumb),
         scanned_at=datetime.now(timezone.utc),
     )

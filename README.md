@@ -12,75 +12,102 @@ Everything runs locally. Your photos never leave your machine.
 
 ## Architecture
 
-Hybrid: the database runs in Docker, the app runs natively.
+Split into three deployables plus the database. The heavy ML **worker** runs
+natively on the host (for Apple-Silicon MPS); the light **API**, the **frontend
+gateway**, and **Postgres** run in Docker.
 
 ```
-┌──────────────┐     REST (localhost:8000)     ┌──────────────────────────┐
-│  Frontend    │ ───────────────────────────► │  Backend (FastAPI)        │
-│  React + Vite│                               │  CLIP + InsightFace (MPS) │
-│  :5173       │ ◄─────────────────────────── │  HDBSCAN clustering       │
-└──────────────┘                               └────────────┬─────────────┘
-                                                             │ SQLAlchemy
-                                                   ┌─────────▼──────────┐
-                                                   │ Postgres + pgvector │
-                                                   │ (Docker) :5432      │
-                                                   └────────────────────┘
+                            ┌──────────────────────────────┐
+                            │  Frontend + nginx gateway     │  Docker :80
+  browser ────────────────► │  serves SPA, proxies by path  │
+                            └───────┬───────────────┬───────┘
+          /persons /sim-clusters    │               │   /scan /cluster /pick-folder
+          /photos /faces /health    │               │   /thumb /face-thumb /image
+                            ┌───────▼──────┐   ┌─────▼──────────────────────┐
+                            │  API         │   │  Worker (native host) :8001 │
+                            │  (Docker)    │   │  CLIP + InsightFace (MPS)   │
+                            │  persons+sim │   │  HDBSCAN + media files      │
+                            │  :8000       │   └─────┬──────────────────────┘
+                            └───────┬──────┘         │
+                                    │ SQLAlchemy      │ SQLAlchemy
+                                 ┌──▼─────────────────▼──┐
+                                 │ Postgres + pgvector     │  Docker :5432
+                                 └─────────────────────────┘
 ```
 
-- **Backend** — FastAPI + SQLAlchemy 2. CLIP (`open_clip` ViT-B/32) embeds
-  whole images; InsightFace (`buffalo_l`) detects and embeds faces; HDBSCAN
-  clusters both embedding sets. It runs **natively on the host** so it can use
-  Apple Silicon's **MPS** GPU — Docker Desktop on macOS has no GPU/MPS access,
-  so containerising the model code would force slow CPU inference.
-- **Postgres + pgvector** — stores photo metadata and the 512-d embeddings, and
-  serves cosine-distance kNN for the similarity search. Runs in Docker.
-- **Frontend** — React + Vite (TypeScript), talks to the backend over REST.
+- **Worker** (native, `app.main_worker`) — owns everything heavy or host-bound:
+  the scan pipeline (CLIP `open_clip` ViT-B/32 image embeddings, InsightFace
+  `buffalo_l` face detect+embed), HDBSCAN/DBSCAN clustering, the native folder
+  picker, and serving thumbnail/original image files. Runs natively so it can use
+  Apple Silicon's **MPS** GPU — Docker Desktop on macOS has no GPU/MPS access, so
+  containerising the models would force slow CPU inference. Needs the `worker`
+  dependency extra (torch, insightface, …).
+- **API** (Docker, `app.main_api`) — the light, DB-only surface: persons and
+  similarity clusters. Pulls **none** of the ML stack, so the image is small and
+  portable. Base deps only.
+- **Frontend + gateway** (Docker) — React + Vite built to static files, served by
+  nginx which also reverse-proxies each backend path to the right service, so the
+  browser sees a single origin (no CORS).
+- **Postgres + pgvector** — photo metadata + 512-d embeddings, cosine kNN for
+  similarity. Runs in Docker.
 
 ## Prerequisites
 
-- **Docker** (for Postgres + pgvector)
-- **Python 3.11**
-- **Node.js** (18+) and npm
+- **Docker** (Postgres, API, frontend gateway)
+- **Python 3.11** (native worker)
+- **Node.js** (18+) and npm (only if running the frontend in dev mode)
 
 ## Setup
 
-### 1. Start Postgres (pgvector)
+### 1. Start the Dockerised pieces (db + api + frontend gateway)
 
 ```bash
-docker compose up -d db
+docker compose up -d --build
 ```
 
-This boots `pgvector/pgvector:pg16` on `localhost:5432`
-(`photo` / `photo` / db `photos`) and applies `backend/sql/001_init.sql`
-(extension, tables, ivfflat cosine indexes).
+This boots:
+- `db` — `pgvector/pgvector:pg16` on `localhost:5432` (`photo` / `photo` / db
+  `photos`), applying `backend/sql/001_init.sql`.
+- `api` — the slim persons/similarity API (internal `:8000`).
+- `frontend` — the SPA + nginx gateway on **http://localhost** (`:80`). It proxies
+  `/scan`, `/cluster`, `/pick-folder`, `/thumb`, `/face-thumb`, `/image` to the
+  native worker, and everything else to `api`.
 
-### 2. Backend
+### 2. Run the native ML worker
 
 ```bash
 cd backend
 python3.11 -m venv .venv
-.venv/bin/pip install -e .
+.venv/bin/pip install -e '.[worker,dev]'
 
-# Run the API (reload for development):
-.venv/bin/python -m uvicorn app.main:app --reload --port 8000
+# Serve the worker (reload for development):
+PHOTO_DATABASE_URL=postgresql+psycopg://photo:photo@localhost:5432/photos \
+  .venv/bin/python -m uvicorn app.main_worker:app --reload --port 8001
 ```
 
 > **First run downloads model weights (~1 GB)** for CLIP and InsightFace and
 > caches them under your home directory. This is a one-time cost. Because
-> Docker-on-Mac has no MPS, the backend runs **natively** so it can use the
+> Docker-on-Mac has no MPS, the worker runs **natively** so it can use the
 > Apple Silicon GPU.
 
-Check it's up: `curl localhost:8000/health` → `{"status":"ok"}`.
+Check it's up: `curl localhost:8001/health` → `{"status":"ok"}`, and the gateway
+`curl localhost/health` → `{"status":"ok"}` (served by `api`).
 
-### 3. Frontend
+Open **http://localhost**.
+
+### Dev alternative: run everything natively
+
+For a tight edit loop you can skip the api/frontend containers and run the
+combined app + Vite dev server instead (only `db` needs Docker):
 
 ```bash
-cd frontend
-npm install
-npm run dev
+docker compose up -d db
+cd backend && .venv/bin/python -m uvicorn app.main:app --reload --port 8000
+cd frontend && npm install && VITE_API_BASE=http://localhost:8000 npm run dev
 ```
 
-Open http://localhost:5173.
+`app.main` mounts every router in one process; `VITE_API_BASE` points the Vite
+dev server (`:5173`) straight at it.
 
 ## Usage
 

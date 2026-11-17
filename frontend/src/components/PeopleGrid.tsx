@@ -1,48 +1,61 @@
-import { useCallback, useEffect, useState } from "react";
-import {
-  getPersons,
-  mergePersons,
-  hidePerson,
-  unhidePerson,
-  faceThumbUrl,
-  thumbUrl,
-  type Person,
-} from "../api";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { getPersons, mergePersons, hidePerson, unhidePerson, faceThumbUrl, thumbUrl, type Person } from "../api";
 import ImgWithFallback from "./ImgWithFallback";
 import PersonDetail from "./PersonDetail";
+import Icon from "./Icon";
 
 const personPlaceholder = (
-  <div className="thumb thumb-placeholder" aria-hidden="true">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+  <div className="w-full h-full flex items-center justify-center bg-gradient-to-b from-surface-container to-surface text-outline-variant" aria-hidden="true">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="w-[38%] h-[38%]">
       <circle cx="12" cy="8" r="4" />
       <path d="M4 20c0-3.3 3.6-6 8-6s8 2.7 8 6" strokeLinecap="round" />
     </svg>
   </div>
 );
 
-export default function PeopleGrid() {
+interface Props {
+  initialShowHidden?: boolean;
+  hiddenOnly?: boolean;
+}
+
+export default function PeopleGrid({ initialShowHidden = false, hiddenOnly = false }: Props) {
   const [persons, setPersons] = useState<Person[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [openId, setOpenId] = useState<number | null>(null);
-  const [showHidden, setShowHidden] = useState(false);
+  const [showHidden, setShowHidden] = useState(initialShowHidden);
 
   const [selectMode, setSelectMode] = useState(false);
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [merging, setMerging] = useState(false);
-  // Ids with a hide/unhide request in flight, to disable the button.
   const [busy, setBusy] = useState<Set<number>>(new Set());
+  const [density, setDensity] = useState<"comfortable" | "compact">("comfortable");
+  // Remember the gallery scroll position so returning from a person restores it.
+  const scrollPos = useRef(0);
+
+  const scroller = () => document.querySelector<HTMLElement>("main.custom-scroll");
+
+  function openPerson(id: number) {
+    scrollPos.current = scroller()?.scrollTop ?? 0;
+    setOpenId(id);
+  }
+
+  useLayoutEffect(() => {
+    const el = scroller();
+    if (!el) return;
+    el.scrollTop = openId === null ? scrollPos.current : 0;
+  }, [openId]);
 
   const load = useCallback(() => {
     setLoading(true);
-    getPersons(showHidden)
+    getPersons(hiddenOnly ? true : showHidden)
       .then((p) => {
-        setPersons(p);
+        setPersons(hiddenOnly ? p.filter((x) => x.hidden) : p);
         setError(null);
       })
       .catch((e) => setError(e instanceof Error ? e.message : String(e)))
       .finally(() => setLoading(false));
-  }, [showHidden]);
+  }, [showHidden, hiddenOnly]);
 
   useEffect(() => {
     load();
@@ -81,12 +94,8 @@ export default function PeopleGrid() {
     try {
       if (p.hidden) await unhidePerson(p.id);
       else await hidePerson(p.id);
-      // Reflect the change locally: when the list excludes hidden, drop the
-      // card; otherwise flip its flag in place.
       setPersons((prev) =>
-        showHidden
-          ? prev.map((x) => (x.id === p.id ? { ...x, hidden: !x.hidden } : x))
-          : prev.filter((x) => x.id !== p.id)
+        hiddenOnly || !showHidden ? prev.filter((x) => x.id !== p.id) : prev.map((x) => (x.id === p.id ? { ...x, hidden: !x.hidden } : x))
       );
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
@@ -100,113 +109,223 @@ export default function PeopleGrid() {
   }
 
   if (openId !== null) {
-    return (
-      <PersonDetail
-        personId={openId}
-        onBack={() => setOpenId(null)}
-        onChanged={load}
-      />
-    );
+    return <PersonDetail personId={openId} onBack={() => setOpenId(null)} onChanged={load} />;
   }
 
   return (
-    <div>
-      <div className="toolbar">
-        {!selectMode ? (
-          <button onClick={() => setSelectMode(true)}>Select</button>
-        ) : (
-          <>
-            <button onClick={exitSelect}>Cancel</button>
-            <span className="hint">{selected.size} selected</span>
-            {selected.size >= 2 && (
+    <>
+      {/* GALLERY CONTROLS & STATS BAR */}
+      <section className="px-space-lg lg:px-margin-lg py-space-md flex flex-wrap items-center justify-between gap-space-md">
+        <div className="flex items-center gap-space-md">
+          {!selectMode ? (
+            <button
+              onClick={() => setSelectMode(true)}
+              className="px-space-md py-1.5 rounded-xl bg-[#171922] border border-[#232736] hover:border-primary text-on-surface text-label-md font-label-md flex items-center gap-2 transition-colors"
+            >
+              <Icon name="check_box" className="text-base text-primary" />
+              Select
+            </button>
+          ) : (
+            <>
               <button
-                className="primary"
-                onClick={() => void doMerge()}
-                disabled={merging}
+                onClick={exitSelect}
+                className="px-space-md py-1.5 rounded-xl bg-[#171922] border border-[#232736] hover:border-outline-variant text-on-surface text-label-md font-label-md transition-colors"
               >
-                {merging ? "Merging…" : `Merge selected (${selected.size})`}
+                Cancel
               </button>
-            )}
-          </>
-        )}
-        <div className="spacer" />
-        <button
-          className={showHidden ? "active" : ""}
-          onClick={() => setShowHidden((v) => !v)}
-        >
-          {showHidden ? "Hide hidden" : "Show hidden"}
-        </button>
-        <button onClick={load} disabled={loading}>
-          Refresh
-        </button>
-      </div>
-
-      {error && <div className="error-text">{error}</div>}
-      {loading && <div className="loading">Loading people…</div>}
-      {!loading && persons.length === 0 && (
-        <div className="empty">
-          {showHidden
-            ? "No hidden people."
-            : "No people yet. Scan a folder to get started."}
+              <span className="text-body-sm font-body-sm text-outline">{selected.size} selected</span>
+            </>
+          )}
+          <span className="text-body-sm font-body-sm text-outline">
+            Showing <strong className="text-on-surface font-semibold">{persons.length} {hiddenOnly ? "hidden" : persons.length === 1 ? "subject" : "identified subjects"}</strong>
+          </span>
         </div>
-      )}
 
-      <div className="grid">
-        {persons.map((p) => (
-          <div
-            key={p.id}
-            className={`card ${selected.has(p.id) ? "selected" : ""} ${
-              p.hidden ? "is-hidden" : ""
-            }`}
-            data-testid="person-card"
-            onClick={() => (selectMode ? toggle(p.id) : setOpenId(p.id))}
-          >
-            {selectMode && (
-              <input
-                type="checkbox"
-                className="card-check"
-                checked={selected.has(p.id)}
-                onChange={() => toggle(p.id)}
-                onClick={(e) => e.stopPropagation()}
-              />
-            )}
-            {!selectMode && (
-              <button
-                className="card-hide"
-                data-testid="person-hide-btn"
-                title={p.hidden ? "Unhide this person" : "Hide this person"}
-                disabled={busy.has(p.id)}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  void toggleHidden(p);
-                }}
-              >
-                {p.hidden ? "Unhide" : "Hide"}
-              </button>
-            )}
-            {p.cover_face_id != null || p.cover_photo_id != null ? (
-              <ImgWithFallback
-                className="thumb"
-                sources={[
-                  p.cover_face_id != null ? faceThumbUrl(p.cover_face_id) : null,
-                  p.cover_photo_id != null ? thumbUrl(p.cover_photo_id) : null,
-                ].filter((s): s is string => s != null)}
-                alt={p.name ?? "Unnamed"}
-                placeholder={personPlaceholder}
-              />
-            ) : (
-              personPlaceholder
-            )}
-            <div className="card-body">
-              <div className="card-title">{p.name ?? "Unnamed"}</div>
-              <div className="card-sub">
-                {p.face_count} {p.face_count === 1 ? "face" : "faces"}
-                {p.hidden ? " · hidden" : ""}
+        <div className="flex items-center gap-space-sm">
+          {!hiddenOnly && (
+            <label className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#171922] border border-[#232736] cursor-pointer hover:border-outline-variant">
+              <input className="sr-only peer" type="checkbox" checked={showHidden} onChange={() => setShowHidden((v) => !v)} />
+              <div className="w-8 h-4 bg-surface-container peer-checked:bg-indigo-600 rounded-full transition-colors relative">
+                <div className="w-3 h-3 bg-white rounded-full absolute top-0.5 left-0.5 peer-checked:left-[17px] transition-all" />
               </div>
-            </div>
+              <span className="text-label-md font-label-md text-on-surface-variant">Show hidden</span>
+            </label>
+          )}
+          <button
+            onClick={load}
+            disabled={loading}
+            title="Reload faces"
+            className="w-9 h-9 rounded-xl bg-[#171922] border border-[#232736] flex items-center justify-center text-outline hover:text-on-surface hover:border-outline-variant transition-colors disabled:opacity-45"
+          >
+            <Icon name="refresh" className={`text-lg ${loading ? "animate-spin" : ""}`} />
+          </button>
+          <div className="flex items-center bg-[#171922] border border-[#232736] rounded-xl p-0.5">
+            <button
+              onClick={() => setDensity("comfortable")}
+              className={`p-1 rounded-lg ${density === "comfortable" ? "bg-surface-container-high text-primary" : "text-outline hover:text-on-surface"}`}
+              title="Comfortable grid"
+            >
+              <Icon name="grid_view" className="text-base" />
+            </button>
+            <button
+              onClick={() => setDensity("compact")}
+              className={`p-1 rounded-lg ${density === "compact" ? "bg-surface-container-high text-primary" : "text-outline hover:text-on-surface"}`}
+              title="Compact grid"
+            >
+              <Icon name="apps" className="text-base" />
+            </button>
           </div>
-        ))}
-      </div>
-    </div>
+        </div>
+      </section>
+
+      {/* GALLERY 5-COLUMN PEOPLE GRID */}
+      <section className="px-space-lg lg:px-margin-lg pb-32 flex-1">
+        {error && (
+          <div className="mb-4 text-body-sm text-error flex items-center gap-1.5">
+            <Icon name="error" className="text-base" />
+            {error}
+          </div>
+        )}
+        {loading && <div className="text-outline py-12 text-center">Loading people…</div>}
+        {!loading && persons.length === 0 && (
+          <div className="text-outline py-12 text-center">
+            {hiddenOnly ? "No hidden people." : "No people yet. Scan a folder to get started."}
+          </div>
+        )}
+
+        <div
+          className={`grid gap-space-lg ${
+            density === "compact"
+              ? "grid-cols-4 sm:grid-cols-6 md:grid-cols-7 lg:grid-cols-8 2xl:grid-cols-10"
+              : "grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 2xl:grid-cols-7"
+          }`}
+        >
+          {persons.map((p) => {
+            const isSel = selected.has(p.id);
+            const unnamed = !p.name;
+            return (
+              <div
+                key={p.id}
+                data-testid="person-card"
+                onClick={() => (selectMode ? toggle(p.id) : openPerson(p.id))}
+                className={`group relative rounded-2xl bg-[#171922] overflow-hidden cursor-pointer transition-all duration-300 ${
+                  isSel
+                    ? "border border-indigo-500/80 ring-2 ring-indigo-500/30 shadow-xl shadow-indigo-500/10 scale-[1.02]"
+                    : "border border-[#232736] hover:border-indigo-500/50 hover:shadow-lg"
+                } ${p.hidden ? "opacity-70" : ""}`}
+              >
+                {/* Select check (top-left) */}
+                {selectMode && (
+                  <div className="absolute top-2.5 left-2.5 z-20">
+                    <div className={`w-5 h-5 rounded-md flex items-center justify-center text-white text-xs shadow-sm ${isSel ? "bg-indigo-600" : "bg-[#0b0d12]/70 ring-1 ring-white/30"}`}>
+                      {isSel && <Icon name="check" className="text-sm" />}
+                    </div>
+                  </div>
+                )}
+
+                {/* Hide badge (top-right) */}
+                {!selectMode && (
+                  <div className={`absolute top-2.5 right-2.5 z-20 transition-opacity ${p.hidden ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}>
+                    <button
+                      data-testid="person-hide-btn"
+                      title={p.hidden ? "Unhide this person" : "Hide this person"}
+                      disabled={busy.has(p.id)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        void toggleHidden(p);
+                      }}
+                      className="px-2.5 py-1 rounded-full bg-[#0b0d12]/85 backdrop-blur-md border border-white/10 hover:border-white/30 text-white text-label-sm font-label-sm flex items-center gap-1 transition-all disabled:opacity-50"
+                    >
+                      <Icon name={p.hidden ? "visibility" : "visibility_off"} className="text-xs" />
+                      {p.hidden ? "Unhide" : "Hide"}
+                    </button>
+                  </div>
+                )}
+
+                {/* Image (4:5) */}
+                <div className={`aspect-[4/5] w-full overflow-hidden bg-surface-container ${p.hidden ? "grayscale" : ""}`}>
+                  {p.cover_face_id != null || p.cover_photo_id != null ? (
+                    <ImgWithFallback
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                      sources={[
+                        p.cover_face_id != null ? faceThumbUrl(p.cover_face_id) : null,
+                        p.cover_photo_id != null ? thumbUrl(p.cover_photo_id) : null,
+                      ].filter((s): s is string => s != null)}
+                      alt={p.name ?? "Unnamed"}
+                      placeholder={personPlaceholder}
+                    />
+                  ) : (
+                    personPlaceholder
+                  )}
+                </div>
+
+                {/* Bottom scrim + label */}
+                <div className="absolute inset-x-0 bottom-0 p-4 pt-10 bg-gradient-to-t from-[#0b0d12] via-[#0b0d12]/75 to-transparent flex flex-col justify-end">
+                  {unnamed ? (
+                    <>
+                      <h3 className="text-headline-sm font-headline-sm font-semibold text-on-surface tracking-tight truncate">Unnamed (Person {p.id})</h3>
+                      <p className="text-body-sm font-body-sm text-primary mt-0.5 truncate">
+                        {p.face_count} {p.face_count === 1 ? "face" : "faces"} • Click to label
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      <div className="flex items-center justify-between">
+                        <h3 className="text-headline-sm font-headline-sm font-bold text-white tracking-tight truncate">{p.name}</h3>
+                        <Icon name="verified" className="text-indigo-400 text-sm shrink-0" />
+                      </div>
+                      <p className="text-body-sm font-body-sm text-outline mt-0.5">
+                        {p.face_count} {p.face_count === 1 ? "face" : "faces"}
+                        {p.hidden ? " • hidden" : ""}
+                      </p>
+                    </>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </section>
+
+      {/* FLOATING STATUS / ACTION DOCK */}
+      {selectMode && selected.size >= 2 ? (
+        <aside className="fixed bottom-6 left-1/2 -translate-x-1/2 z-30 flex items-center gap-space-md px-space-xl py-space-sm bg-[#171922]/90 backdrop-blur-xl border border-white/10 rounded-full shadow-2xl shadow-black/80 ring-1 ring-white/5">
+          <p className="text-label-md font-label-md text-on-surface border-r border-[#232736] pr-space-lg">{selected.size} selected</p>
+          <button
+            onClick={() => void doMerge()}
+            disabled={merging}
+            className="px-space-lg py-1.5 rounded-xl bg-gradient-to-r from-indigo-500 to-violet-600 hover:opacity-90 text-white font-label-md text-label-md shadow-md shadow-indigo-500/25 active:scale-[0.98] transition-all flex items-center gap-1.5 disabled:opacity-60"
+          >
+            <Icon name="call_merge" className="text-base" />
+            {merging ? "Merging…" : `Merge ${selected.size}`}
+          </button>
+        </aside>
+      ) : (
+        !selectMode &&
+        persons.length > 0 && (
+          <aside className="fixed bottom-6 left-1/2 -translate-x-1/2 z-30 flex items-center gap-space-md px-space-xl py-space-sm bg-[#171922]/90 backdrop-blur-xl border border-white/10 rounded-full shadow-2xl shadow-black/80 ring-1 ring-white/5">
+            <div className="flex items-center gap-2 border-r border-[#232736] pr-space-lg">
+              <div className="w-2.5 h-2.5 rounded-full bg-indigo-400 animate-ping" />
+              <p className="text-label-md font-label-md text-on-surface">
+                {persons.length} {persons.length === 1 ? "cluster" : "clusters"} generated <span className="text-tertiary font-semibold">on-device</span>
+              </p>
+            </div>
+            <div className="flex items-center gap-space-sm">
+              <button
+                onClick={() => setSelectMode(true)}
+                className="px-space-md py-1.5 rounded-xl bg-surface-container-high hover:bg-surface-variant text-on-surface border border-outline-variant text-label-md font-label-md active:scale-[0.98] transition-all flex items-center gap-1.5"
+              >
+                <Icon name="call_merge" className="text-base" />
+                Merge Similar
+              </button>
+              <button className="px-space-lg py-1.5 rounded-xl bg-gradient-to-r from-indigo-500 to-violet-600 hover:opacity-90 text-white font-label-md text-label-md shadow-md shadow-indigo-500/25 active:scale-[0.98] transition-all flex items-center gap-1.5">
+                <Icon name="file_upload" className="text-base" />
+                Export Groups
+              </button>
+            </div>
+          </aside>
+        )
+      )}
+    </>
   );
 }

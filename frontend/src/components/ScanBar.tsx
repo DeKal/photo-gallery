@@ -1,16 +1,23 @@
 import { useEffect, useRef, useState } from "react";
 import { startScan, getScan, cluster, pickFolder, type Scan } from "../api";
+import Icon from "./Icon";
 
 interface Props {
   // Called once a scan has completed AND clustering has finished, so the
   // active view can refresh its data.
   onClustered: () => void;
+  // Controlled folder path (so the sidebar Import Folder can populate it).
+  path: string;
+  onPathChange: (path: string) => void;
 }
 
 type Phase = "idle" | "scanning" | "clustering" | "done" | "error";
 
-export default function ScanBar({ onClustered }: Props) {
-  const [path, setPath] = useState("");
+// Remember the in-flight scan id so a page refresh re-attaches to it (the scan
+// itself keeps running on the backend). Single scan at a time.
+const STORAGE_KEY = "photocluster.activeScanId";
+
+export default function ScanBar({ onClustered, path, onPathChange }: Props) {
   const [scan, setScan] = useState<Scan | null>(null);
   const [phase, setPhase] = useState<Phase>("idle");
   const [error, setError] = useState<string | null>(null);
@@ -20,6 +27,34 @@ export default function ScanBar({ onClustered }: Props) {
     return () => {
       if (pollRef.current !== null) window.clearTimeout(pollRef.current);
     };
+  }, []);
+
+  // On mount, re-attach to a scan that was running when the page was left.
+  useEffect(() => {
+    const saved = localStorage.getItem(STORAGE_KEY);
+    if (!saved) return;
+    const id = Number(saved);
+    if (!Number.isFinite(id)) {
+      localStorage.removeItem(STORAGE_KEY);
+      return;
+    }
+    getScan(id)
+      .then((s) => {
+        setScan(s);
+        if (s.status === "completed") {
+          // Finished while away — run the clustering the prior session missed.
+          void runClustering().finally(() => localStorage.removeItem(STORAGE_KEY));
+        } else if (s.status === "failed") {
+          setPhase("error");
+          setError("Previous scan failed.");
+          localStorage.removeItem(STORAGE_KEY);
+        } else {
+          setPhase("scanning");
+          poll(id);
+        }
+      })
+      .catch(() => localStorage.removeItem(STORAGE_KEY));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const busy = phase === "scanning" || phase === "clustering";
@@ -41,8 +76,10 @@ export default function ScanBar({ onClustered }: Props) {
       .then((s) => {
         setScan(s);
         if (s.status === "completed") {
+          localStorage.removeItem(STORAGE_KEY);
           void runClustering();
         } else if (s.status === "failed") {
+          localStorage.removeItem(STORAGE_KEY);
           setPhase("error");
           setError("Scan failed.");
         } else {
@@ -62,6 +99,7 @@ export default function ScanBar({ onClustered }: Props) {
     setPhase("scanning");
     try {
       const { scan_id } = await startScan(path.trim());
+      localStorage.setItem(STORAGE_KEY, String(scan_id));
       poll(scan_id);
     } catch (e) {
       setPhase("error");
@@ -73,7 +111,7 @@ export default function ScanBar({ onClustered }: Props) {
     setError(null);
     try {
       const { path: picked } = await pickFolder();
-      if (picked) setPath(picked);
+      if (picked) onPathChange(picked);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     }
@@ -82,69 +120,97 @@ export default function ScanBar({ onClustered }: Props) {
   const total = scan?.total ?? 0;
   const done = scan?.done ?? 0;
   const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+  const status = phase === "clustering" ? "clustering" : scan?.status ?? "";
+  const completed = status === "completed";
+  const failed = status === "failed";
 
   return (
     <div>
-      <div className="scanbar">
-        <input
-          type="text"
-          placeholder="/path/to/your/photos"
-          data-testid="scan-input"
-          value={path}
-          onChange={(e) => setPath(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === "Enter" && !busy) void onScan();
-          }}
-          disabled={busy}
-        />
-        <button
-          data-testid="browse-btn"
-          onClick={() => void onBrowse()}
-          disabled={busy}
-        >
-          Browse…
-        </button>
-        <button
-          className="primary"
-          data-testid="scan-btn"
-          onClick={() => void onScan()}
-          disabled={busy || !path.trim()}
-        >
-          {phase === "scanning"
-            ? "Scanning…"
-            : phase === "clustering"
-              ? "Clustering…"
-              : "Scan"}
-        </button>
+      {/* Scan bar input cluster */}
+      <div className="flex flex-col lg:flex-row items-stretch lg:items-center gap-space-md mb-space-lg">
+        <div className="flex-1 flex items-center bg-[#171922] border border-[#232736] rounded-xl px-3 py-2 shadow-inner focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-500/20 transition-all">
+          <Icon name="folder" className="text-outline mr-2 text-[20px]" />
+          <input
+            type="text"
+            data-testid="scan-input"
+            className="w-full bg-transparent text-on-surface text-body-sm font-body-sm outline-none border-none p-0 focus:ring-0 placeholder:text-outline"
+            placeholder="/path/to/your/photos"
+            value={path}
+            onChange={(e) => onPathChange(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !busy) void onScan();
+            }}
+            disabled={busy}
+          />
+          {path && !busy && (
+            <button className="ml-2 text-outline hover:text-on-surface" title="Clear path" onClick={() => onPathChange("")}>
+              <Icon name="close" className="text-base" />
+            </button>
+          )}
+        </div>
+        <div className="flex items-center gap-space-sm">
+          <button
+            data-testid="browse-btn"
+            onClick={() => void onBrowse()}
+            disabled={busy}
+            className="px-space-lg py-2 rounded-xl bg-[#171922] border border-[#232736] hover:bg-surface-container hover:border-outline-variant text-on-surface text-label-md font-label-md active:scale-[0.98] transition-all flex items-center gap-1.5 disabled:opacity-45 disabled:cursor-not-allowed"
+          >
+            <Icon name="travel_explore" className="text-base" />
+            Browse…
+          </button>
+          <button
+            data-testid="scan-btn"
+            onClick={() => void onScan()}
+            disabled={busy || !path.trim()}
+            className="px-space-xl py-2 rounded-xl bg-gradient-to-r from-indigo-500 via-indigo-600 to-violet-600 hover:opacity-90 text-white font-label-md text-label-md shadow-lg shadow-indigo-500/25 active:scale-[0.98] transition-all flex items-center gap-2 disabled:opacity-45 disabled:cursor-not-allowed"
+          >
+            <Icon name={busy ? "progress_activity" : "play_arrow"} className={`text-base ${busy ? "animate-spin" : ""}`} />
+            {phase === "scanning" ? "Scanning…" : phase === "clustering" ? "Clustering…" : "Scan"}
+          </button>
+        </div>
       </div>
 
+      {/* Progress & indexing row */}
       {(scan || phase === "clustering") && (
-        <div className="progress">
-          <div className="progress-meta">
-            <span
-              className={`status-pill ${
-                phase === "clustering" ? "running" : scan?.status ?? ""
-              }`}
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-space-md pb-space-xs">
+          <div className="flex items-center gap-space-md">
+            <div
               data-testid="scan-status"
+              className={`flex items-center gap-2 px-2.5 py-1 rounded-full border text-label-sm font-label-sm ${
+                completed
+                  ? "bg-emerald-500/10 border-emerald-500/25 text-emerald-400"
+                  : failed
+                    ? "bg-error/10 border-error/30 text-error"
+                    : "bg-indigo-500/10 border-indigo-500/25 text-indigo-300"
+              }`}
             >
-              {phase === "clustering" ? "clustering" : scan?.status}
-            </span>
+              <span className="w-2 h-2 rounded-full bg-current animate-pulse" />
+              {status}
+            </div>
             {scan && (
-              <span>
-                {done} / {total} images
+              <span className="text-body-sm font-body-sm text-on-surface-variant font-medium">
+                {done} / {total} images indexed
               </span>
             )}
           </div>
-          <div className="progress-track">
-            <div
-              className={`progress-fill ${phase === "clustering" ? "clustering" : ""}`}
-              style={{ width: `${phase === "clustering" ? 100 : pct}%` }}
-            />
+          <div className="w-full sm:w-64 flex items-center gap-3">
+            <div className="flex-1 h-1.5 bg-surface-container rounded-full overflow-hidden">
+              <div
+                className="h-full bg-gradient-to-r from-indigo-500 to-violet-500 rounded-full transition-all duration-300"
+                style={{ width: `${phase === "clustering" ? 100 : pct}%` }}
+              />
+            </div>
+            <span className="text-label-sm font-label-sm text-outline">{phase === "clustering" ? "…" : `${pct}%`}</span>
           </div>
         </div>
       )}
 
-      {error && <div className="error-text">{error}</div>}
+      {error && (
+        <div className="pt-space-xs text-body-sm text-error flex items-center gap-1.5">
+          <Icon name="error" className="text-base" />
+          {error}
+        </div>
+      )}
     </div>
   );
 }

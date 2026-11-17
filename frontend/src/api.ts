@@ -1,10 +1,12 @@
 // Typed REST client for the photo-clustering backend.
 //
-// The backend runs natively on the host at http://localhost:8000 and its CORS
-// config already allows http://localhost:5173 (the Vite dev server), so we call
-// it directly. Override with VITE_API_BASE at build/dev time if needed.
+// In production the app is served behind an nginx gateway that proxies every
+// backend path to the right service (ML/media -> native worker, the rest -> the
+// api container), so BASE defaults to "" (same origin). For the direct-dev
+// workflow (Vite on :5173, backends on their own ports) set VITE_API_BASE —
+// e.g. http://localhost:8000 for the combined app.
 export const BASE: string =
-  (import.meta.env.VITE_API_BASE as string | undefined) ?? "http://localhost:8000";
+  (import.meta.env.VITE_API_BASE as string | undefined) ?? "";
 
 // ---- Types ---------------------------------------------------------------
 
@@ -184,4 +186,30 @@ export function getSimClusterPhotos(id: number): Promise<Photo[]> {
 
 export function getSimilar(photoId: number, k = 50): Promise<SimilarPhoto[]> {
   return request(`/photos/${photoId}/similar?k=${k}`);
+}
+
+// ---- All Photos (flat library) ------------------------------------------
+
+export interface PhotoListItem {
+  id: number;
+  path: string;
+  thumb_path: string | null;
+  width: number | null;
+  height: number | null;
+  taken_at: string | null;
+}
+
+export interface PhotoListPage {
+  total: number;
+  items: PhotoListItem[];
+}
+
+export type PhotoOrder = "newest" | "oldest";
+
+export function getPhotos(
+  limit = 120,
+  offset = 0,
+  order: PhotoOrder = "newest",
+): Promise<PhotoListPage> {
+  return request(`/photos?limit=${limit}&offset=${offset}&order=${order}`);
 }

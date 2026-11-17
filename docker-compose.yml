@@ -1,3 +1,5 @@
+name: photo-app
+
 services:
   db:
     image: pgvector/pgvector:pg16
@@ -9,5 +11,31 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./backend/sql/001_init.sql:/docker-entrypoint-initdb.d/001_init.sql
+
+  # Light, DB-only API (persons + similarity). No ML stack.
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.api
+    environment:
+      PHOTO_DATABASE_URL: postgresql+psycopg://photo:photo@db:5432/photos
+    depends_on: [db]
+
+  # Static SPA + nginx gateway. Proxies ML/media paths to the native worker on
+  # the host (:8001) and the rest to the api container.
+  frontend:
+    build: ./frontend
+    ports: ["8080:80"]
+    depends_on: [api]
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  # NOTE: the ML worker is NOT a compose service. It runs natively on the host
+  # to keep Apple-Silicon MPS, the osascript folder picker, and direct access to
+  # your photo library:
+  #   cd backend && \
+  #   PHOTO_DATABASE_URL=postgresql+psycopg://photo:photo@localhost:5432/photos \
+  #   .venv/bin/uvicorn app.main_worker:app --port 8001
+
 volumes:
   pgdata:

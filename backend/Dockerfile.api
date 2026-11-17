@@ -1,0 +1,20 @@
+# Slim API image: the light, DB-only surface (persons + similarity).
+# Deliberately installs only the base deps from pyproject (no torch/ML/Pillow),
+# so the image stays small. The ML worker runs natively on the host instead.
+FROM python:3.11-slim
+
+WORKDIR /srv
+
+# Install deps first (better layer caching). Copy the packaging metadata and the
+# app package, then a plain `pip install .` pulls the slim base dependencies.
+COPY pyproject.toml ./
+COPY app ./app
+
+RUN pip install --no-cache-dir .
+
+# Talk to the Postgres service on the compose network. Override as needed.
+ENV PHOTO_DATABASE_URL=postgresql+psycopg://photo:photo@db:5432/photos
+
+EXPOSE 8000
+
+CMD ["uvicorn", "app.main_api:app", "--host", "0.0.0.0", "--port", "8000"]

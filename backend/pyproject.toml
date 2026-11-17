@@ -7,6 +7,9 @@ name = "photo-backend"
 version = "0.1.0"
 description = "Backend for the photo-clustering web app"
 requires-python = ">=3.11"
+# Base (slim) deps: everything the light API + shared db/models/schemas/config
+# need. Deliberately excludes the ML stack and Pillow so the api Docker image
+# stays small. The heavy worker installs these plus the `worker` extra below.
 dependencies = [
     "fastapi",
     "uvicorn[standard]",
@@ -14,6 +17,12 @@ dependencies = [
     "psycopg[binary]",
     "pgvector",
     "pydantic-settings",
+]
+
+[project.optional-dependencies]
+# Heavy ML + image stack, needed only by the native worker (scan pipeline,
+# analyzer, clusterer, media thumbnailing). Install with `.[worker]`.
+worker = [
     "pillow",
     "pillow-heif",
     "numpy",
@@ -23,6 +32,9 @@ dependencies = [
     "onnxruntime",
     "hdbscan",
     "scikit-learn",
+]
+# Test-only deps. The e2e suite exercises the full pipeline, so dev implies worker.
+dev = [
     "httpx",
     "pytest",
 ]
