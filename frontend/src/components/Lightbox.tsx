@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { imageUrl, thumbUrl } from "../api";
+import { imageUrl, thumbUrl, getPhotoPersons, type PhotoPerson } from "../api";
 import Icon from "./Icon";
 
 interface Props {
@@ -8,23 +8,40 @@ interface Props {
   index: number;
   onIndexChange: (i: number) => void;
   onClose: () => void;
-  // Optional per-photo people tags: faces detected + persons present.
-  meta?: Record<number, { faces: number; persons: { id: number; name: string | null }[] }>;
-  // Click a person tag to open that person.
+  // Click a person tag to open that person. Omit to hide the tags.
   onOpenPerson?: (id: number) => void;
-  // Optional action button (e.g. "More like this") shown over the image.
-  actionLabel?: string;
-  onAction?: (id: number) => void;
+  // Show a "More like this" action that opens visual-similarity for the photo.
+  onOpenSimilar?: (id: number) => void;
 }
 
 // Full-screen overlay showing one image at full resolution with prev/next
 // navigation. Click the backdrop or press Escape to dismiss; ←/→ to page.
-export default function Lightbox({ ids, index, onIndexChange, onClose, meta, onOpenPerson, actionLabel, onAction }: Props) {
+// The same viewer is reused by All Photos, People and Similar — it fetches the
+// photo's people itself so every caller gets identical display + actions.
+export default function Lightbox({ ids, index, onIndexChange, onClose, onOpenPerson, onOpenSimilar }: Props) {
   const count = ids.length;
   const id = ids[index];
   const hasPrev = index > 0;
   const hasNext = index < count - 1;
-  const m = meta?.[id];
+
+  // Who is in this photo (named first). Fetched per-id so the viewer is
+  // self-contained no matter which screen opened it.
+  const [persons, setPersons] = useState<PhotoPerson[]>([]);
+  useEffect(() => {
+    if (id == null) return;
+    let alive = true;
+    setPersons([]);
+    getPhotoPersons(id)
+      .then((p) => {
+        if (alive) setPersons(p);
+      })
+      .catch(() => {
+        if (alive) setPersons([]);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [id]);
 
   // Full-res photos are large, so the previous frame lingers while the next
   // one downloads. Show a thumbnail instantly + a spinner until the full image
@@ -132,27 +149,26 @@ export default function Lightbox({ ids, index, onIndexChange, onClose, meta, onO
             <span className="text-body-sm font-body-sm text-outline tabular-nums">
               {index + 1} / {count}
             </span>
-            {actionLabel && onAction && (
+            {onOpenSimilar && (
               <button
                 data-testid="lightbox-action"
-                onClick={() => onAction(id)}
+                onClick={() => onOpenSimilar(id)}
                 className="px-space-lg py-2 rounded-full bg-gradient-to-r from-indigo-500 to-violet-600 hover:opacity-90 text-white font-label-md text-label-md shadow-lg shadow-indigo-500/30 active:scale-[0.98] transition-all flex items-center gap-2"
               >
                 <Icon name="auto_awesome" className="text-base" />
-                {actionLabel}
+                More like this
               </button>
             )}
           </div>
-          {m && m.persons.length > 0 && (
+          {onOpenPerson && persons.length > 0 && (
             <div className="flex flex-wrap items-center justify-center gap-2 max-w-[90vw]">
-              {m.persons.map((pp) => (
+              {persons.map((pp) => (
                 <button
                   key={pp.id}
                   data-testid="lightbox-person"
-                  onClick={() => onOpenPerson?.(pp.id)}
-                  disabled={!onOpenPerson}
+                  onClick={() => onOpenPerson(pp.id)}
                   title={`Open ${pp.name ?? `Person ${pp.id}`}`}
-                  className="flex items-center gap-1.5 pl-2 pr-3 py-1 rounded-full bg-[#171922]/90 border border-white/10 hover:border-indigo-400 text-on-surface hover:text-white text-label-md font-label-md transition-colors disabled:cursor-default"
+                  className="flex items-center gap-1.5 pl-2 pr-3 py-1 rounded-full bg-[#171922]/90 border border-white/10 hover:border-indigo-400 text-on-surface hover:text-white text-label-md font-label-md transition-colors"
                 >
                   <Icon name={pp.name ? "person" : "person_outline"} className="text-[16px] text-primary" />
                   {pp.name ?? `Person ${pp.id}`}

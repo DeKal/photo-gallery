@@ -214,6 +214,10 @@ export interface PhotoListPage {
 
 export type PhotoOrder = "newest" | "oldest";
 
+export function getPhotoPersons(photoId: number): Promise<PhotoPerson[]> {
+  return request(`/photos/${photoId}/persons`);
+}
+
 export function getPhotos(
   limit = 120,
   offset = 0,

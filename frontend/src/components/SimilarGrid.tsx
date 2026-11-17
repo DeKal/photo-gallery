@@ -84,7 +84,15 @@ type View =
   | { kind: "cluster"; cluster: SimCluster }
   | { kind: "similar"; photoId: number; from: SimCluster | null };
 
-export default function SimilarGrid() {
+export default function SimilarGrid({
+  focus = null,
+  onOpenPerson,
+  onOpenSimilar,
+}: {
+  focus?: { photoId: number; n: number } | null;
+  onOpenPerson?: (id: number) => void;
+  onOpenSimilar?: (id: number) => void;
+}) {
   const [clusters, setClusters] = useState<SimCluster[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -102,17 +110,33 @@ export default function SimilarGrid() {
       .finally(() => setLoading(false));
   }, []);
 
+  // "More like this" requested from another view → jump straight to the
+  // visual-similarity results for that photo.
+  useEffect(() => {
+    if (focus) {
+      setLightbox(null);
+      setView({ kind: "similar", photoId: focus.photoId, from: null });
+    }
+  }, [focus]);
+
   const lb =
     lightbox != null ? (
       <Lightbox
         ids={lightbox.ids}
         index={lightbox.index}
         onIndexChange={(i) => setLightbox((l) => (l ? { ...l, index: i } : l))}
-        actionLabel="More like this"
-        onAction={(id) => {
-          const from = view.kind === "cluster" ? view.cluster : null;
-          setView({ kind: "similar", photoId: id, from });
+        onOpenPerson={
+          onOpenPerson
+            ? (pid) => {
+                setLightbox(null);
+                onOpenPerson(pid);
+              }
+            : undefined
+        }
+        onOpenSimilar={(pid) => {
           setLightbox(null);
+          if (onOpenSimilar) onOpenSimilar(pid);
+          else setView({ kind: "similar", photoId: pid, from: view.kind === "cluster" ? view.cluster : null });
         }}
         onClose={() => setLightbox(null)}
       />

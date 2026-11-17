@@ -15,10 +15,17 @@ export default function App() {
   // Person to auto-open in the People view (e.g. clicked from All Photos). The
   // nonce lets the same person be re-focused after you navigate away and back.
   const [focus, setFocus] = useState<{ id: number; n: number } | null>(null);
+  // Photo to auto-open "More like this" for in the Similar view.
+  const [simFocus, setSimFocus] = useState<{ photoId: number; n: number } | null>(null);
 
   const openPerson = (id: number) => {
     setFocus((f) => ({ id, n: (f?.n ?? 0) + 1 }));
     setNav("people");
+  };
+
+  const openSimilar = (photoId: number) => {
+    setSimFocus((f) => ({ photoId, n: (f?.n ?? 0) + 1 }));
+    setNav("similar");
   };
 
   useEffect(() => {
@@ -119,10 +126,12 @@ export default function App() {
           initialShowHidden={nav === "hidden"}
           hiddenOnly={nav === "hidden"}
           focus={nav === "people" ? focus : null}
+          onOpenPerson={openPerson}
+          onOpenSimilar={openSimilar}
         />
       )}
-      {nav === "similar" && <SimilarGrid key={`similar-${refreshKey}`} />}
-      {nav === "all" && <AllPhotosGrid key={`all-${refreshKey}`} onOpenPerson={openPerson} />}
+      {nav === "similar" && <SimilarGrid key={`similar-${refreshKey}`} focus={simFocus} onOpenPerson={openPerson} onOpenSimilar={openSimilar} />}
+      {nav === "all" && <AllPhotosGrid key={`all-${refreshKey}`} onOpenPerson={openPerson} onOpenSimilar={openSimilar} />}
     </AppShell>
   );
 }

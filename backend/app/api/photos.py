@@ -112,3 +112,24 @@ def list_photos(
             )
         )
     return PhotoListOut(total=total, items=items)
+
+
+@router.get("/photos/{photo_id}/persons", response_model=list[PhotoPerson])
+def photo_persons(
+    photo_id: int, session: Session = Depends(get_session)
+) -> list[PhotoPerson]:
+    """The distinct persons present in a single photo (named first).
+
+    Lets any image viewer show who is in the photo and link to them, without
+    threading the data through the page listing.
+    """
+    rows = session.execute(
+        select(Person.id, Person.name)
+        .join(FacePerson, FacePerson.person_id == Person.id)
+        .join(Face, Face.id == FacePerson.face_id)
+        .where(Face.photo_id == photo_id)
+        .distinct()
+    ).all()
+    persons = [PhotoPerson(id=pid, name=name) for pid, name in rows]
+    persons.sort(key=lambda x: (x.name is None, x.name or "", x.id))
+    return persons

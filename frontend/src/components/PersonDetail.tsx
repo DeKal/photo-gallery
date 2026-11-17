@@ -19,6 +19,8 @@ interface Props {
   personId: number;
   onBack: () => void;
   onChanged: () => void;
+  onOpenPerson?: (id: number) => void;
+  onOpenSimilar?: (id: number) => void;
 }
 
 function basename(path: string): string {
@@ -52,7 +54,7 @@ const photoPlaceholder = (
 // real person data (rename, cover-face picker, photo lightbox). Decorative
 // controls from the mock (Export Face Crops, Filter by Date, search, sort,
 // density, meta tags) are shown inert to match the layout.
-export default function PersonDetail({ personId, onBack, onChanged }: Props) {
+export default function PersonDetail({ personId, onBack, onChanged, onOpenPerson, onOpenSimilar }: Props) {
   const [person, setPerson] = useState<Person | null>(null);
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [faces, setFaces] = useState<Face[]>([]);
@@ -347,6 +349,22 @@ export default function PersonDetail({ personId, onBack, onChanged }: Props) {
           index={lightbox}
           onIndexChange={setLightbox}
           onClose={() => setLightbox(null)}
+          onOpenPerson={
+            onOpenPerson
+              ? (pid) => {
+                  setLightbox(null);
+                  onOpenPerson(pid);
+                }
+              : undefined
+          }
+          onOpenSimilar={
+            onOpenSimilar
+              ? (pid) => {
+                  setLightbox(null);
+                  onOpenSimilar(pid);
+                }
+              : undefined
+          }
         />
       )}
     </div>

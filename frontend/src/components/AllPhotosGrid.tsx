@@ -28,7 +28,13 @@ function monthLabel(takenAt: string | null): string {
   return d.toLocaleDateString(undefined, { month: "long", year: "numeric" });
 }
 
-export default function AllPhotosGrid({ onOpenPerson }: { onOpenPerson?: (id: number) => void }) {
+export default function AllPhotosGrid({
+  onOpenPerson,
+  onOpenSimilar,
+}: {
+  onOpenPerson?: (id: number) => void;
+  onOpenSimilar?: (id: number) => void;
+}) {
   const [items, setItems] = useState<PhotoListItem[]>([]);
   const [total, setTotal] = useState(0);
   const [order, setOrder] = useState<PhotoOrder>("newest");
@@ -199,12 +205,19 @@ export default function AllPhotosGrid({ onOpenPerson }: { onOpenPerson?: (id: nu
           index={lightbox}
           onIndexChange={setLightbox}
           onClose={() => setLightbox(null)}
-          meta={Object.fromEntries(items.map((p) => [p.id, { faces: p.face_count, persons: p.persons }]))}
           onOpenPerson={
             onOpenPerson
               ? (pid) => {
                   setLightbox(null);
                   onOpenPerson(pid);
+                }
+              : undefined
+          }
+          onOpenSimilar={
+            onOpenSimilar
+              ? (pid) => {
+                  setLightbox(null);
+                  onOpenSimilar(pid);
                 }
               : undefined
           }

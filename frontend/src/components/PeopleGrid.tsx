@@ -18,9 +18,18 @@ interface Props {
   hiddenOnly?: boolean;
   // Auto-open this person (focused from another view). Nonce re-triggers.
   focus?: { id: number; n: number } | null;
+  // Cross-view handlers passed through to the photo viewer.
+  onOpenPerson?: (id: number) => void;
+  onOpenSimilar?: (id: number) => void;
 }
 
-export default function PeopleGrid({ initialShowHidden = false, hiddenOnly = false, focus = null }: Props) {
+export default function PeopleGrid({
+  initialShowHidden = false,
+  hiddenOnly = false,
+  focus = null,
+  onOpenPerson,
+  onOpenSimilar,
+}: Props) {
   const [persons, setPersons] = useState<Person[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -121,7 +130,15 @@ export default function PeopleGrid({ initialShowHidden = false, hiddenOnly = fal
   }
 
   if (openId !== null) {
-    return <PersonDetail personId={openId} onBack={() => setOpenId(null)} onChanged={load} />;
+    return (
+      <PersonDetail
+        personId={openId}
+        onBack={() => setOpenId(null)}
+        onChanged={load}
+        onOpenPerson={onOpenPerson}
+        onOpenSimilar={onOpenSimilar}
+      />
+    );
   }
 
   const q = query.trim().toLowerCase();
