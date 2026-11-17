@@ -145,21 +145,16 @@ export default function Lightbox({ ids, index, onIndexChange, onClose, onOpenPer
           )}
         </div>
         <div className="mt-4 flex flex-col items-center gap-3">
-          <div className="flex items-center gap-4">
-            <span className="text-body-sm font-body-sm text-outline tabular-nums">
-              {index + 1} / {count}
-            </span>
-            {onOpenSimilar && (
-              <button
-                data-testid="lightbox-action"
-                onClick={() => onOpenSimilar(id)}
-                className="px-space-lg py-2 rounded-full bg-gradient-to-r from-indigo-500 to-violet-600 hover:opacity-90 text-white font-label-md text-label-md shadow-lg shadow-indigo-500/30 active:scale-[0.98] transition-all flex items-center gap-2"
-              >
-                <Icon name="auto_awesome" className="text-base" />
-                More like this
-              </button>
-            )}
-          </div>
+          {onOpenSimilar && (
+            <button
+              data-testid="lightbox-action"
+              onClick={() => onOpenSimilar(id)}
+              className="px-space-lg py-2 rounded-full bg-gradient-to-r from-indigo-500 to-violet-600 hover:opacity-90 text-white font-label-md text-label-md shadow-lg shadow-indigo-500/30 active:scale-[0.98] transition-all flex items-center gap-2"
+            >
+              <Icon name="auto_awesome" className="text-base" />
+              More like this
+            </button>
+          )}
           {onOpenPerson && persons.length > 0 && (
             <div className="flex flex-wrap items-center justify-center gap-2 max-w-[90vw]">
               {persons.map((pp) => (
