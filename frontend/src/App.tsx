@@ -120,6 +120,12 @@ export default function App() {
         </section>
       )}
 
+      {nav === "all" && (
+        <section className="p-space-lg lg:px-margin-lg lg:pt-space-xl border-b border-outline-variant/60 bg-[#111318]/70 backdrop-blur-md">
+          <ScanBar onClustered={reload} path={scanPath} onPathChange={setScanPath} />
+        </section>
+      )}
+
       {(nav === "people" || nav === "hidden") && (
         <PeopleGrid
           key={`people-${nav}-${refreshKey}`}
