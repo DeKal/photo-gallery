@@ -8,7 +8,7 @@ import Icon from "./components/Icon";
 import { getPersons, getSimClusters, getPhotos, pickFolder } from "./api";
 
 export default function App() {
-  const [nav, setNav] = useState<NavKey>("people");
+  const [nav, setNav] = useState<NavKey>("all");
   const [refreshKey, setRefreshKey] = useState(0);
   const [scanPath, setScanPath] = useState("");
   const [counts, setCounts] = useState<Counts>({ all: null, people: null, similar: null, hidden: null });
