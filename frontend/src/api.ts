@@ -123,17 +123,6 @@ export function getPersons(includeHidden = false): Promise<Person[]> {
   return request(`/persons${includeHidden ? "?include_hidden=true" : ""}`);
 }
 
-export interface PersonGroupExport {
-  id: number;
-  name: string | null;
-  photo_count: number;
-  photos: { id: number; path: string }[];
-}
-
-export function exportPersons(includeHidden = false): Promise<PersonGroupExport[]> {
-  return request(`/persons/export${includeHidden ? "?include_hidden=true" : ""}`);
-}
-
 export function hidePerson(id: number): Promise<Person> {
   return request(`/persons/${id}/hide`, { method: "POST" });
 }
