@@ -132,11 +132,6 @@ export default function Lightbox({ ids, index, onIndexChange, onClose, meta, onO
             <span className="text-body-sm font-body-sm text-outline tabular-nums">
               {index + 1} / {count}
             </span>
-            {m && (
-              <span className="text-body-sm font-body-sm text-outline">
-                {m.faces} {m.faces === 1 ? "face" : "faces"} · {m.persons.length} {m.persons.length === 1 ? "person" : "people"}
-              </span>
-            )}
             {actionLabel && onAction && (
               <button
                 data-testid="lightbox-action"

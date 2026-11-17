@@ -148,17 +148,6 @@ export default function AllPhotosGrid({ onOpenPerson }: { onOpenPerson?: (id: nu
                     alt={p.path}
                     placeholder={photoPlaceholder}
                   />
-                  {p.face_count > 0 && (
-                    <span
-                      title={`${p.face_count} ${p.face_count === 1 ? "face" : "faces"} detected · ${p.person_count} ${p.person_count === 1 ? "person" : "people"} clustered`}
-                      className="absolute top-2 left-2 flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#0b0d12]/75 backdrop-blur-md border border-white/10 text-white text-label-sm font-label-sm shadow-sm"
-                    >
-                      <Icon name="group" className="text-[13px]" />
-                      {p.person_count > 0 && p.person_count !== p.face_count
-                        ? `${p.person_count}/${p.face_count}`
-                        : p.face_count}
-                    </span>
-                  )}
                   <div className="absolute inset-x-0 bottom-0 p-2 bg-gradient-to-t from-surface-dim/95 via-surface-dim/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex flex-col gap-1.5">
                     {p.persons.length > 0 && (
                       <div className="flex flex-wrap gap-1">
