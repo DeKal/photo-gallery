@@ -210,6 +210,8 @@ export default function AllPhotosGrid({
           index={lightbox}
           onIndexChange={setLightbox}
           onClose={() => setLightbox(null)}
+          canLoadMore={hasMore && !loading}
+          onLoadMore={() => loadPage(items.length, order, debounced, false)}
           onOpenPerson={
             onOpenPerson
               ? (pid) => {

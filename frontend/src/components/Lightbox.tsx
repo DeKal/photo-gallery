@@ -12,17 +12,37 @@ interface Props {
   onOpenPerson?: (id: number) => void;
   // Show a "More like this" action that opens visual-similarity for the photo.
   onOpenSimilar?: (id: number) => void;
+  // When at the last loaded image, fetch the next page instead of dead-ending.
+  canLoadMore?: boolean;
+  onLoadMore?: () => void;
 }
 
 // Full-screen overlay showing one image at full resolution with prev/next
 // navigation. Click the backdrop or press Escape to dismiss; ←/→ to page.
 // The same viewer is reused by All Photos, People and Similar — it fetches the
 // photo's people itself so every caller gets identical display + actions.
-export default function Lightbox({ ids, index, onIndexChange, onClose, onOpenPerson, onOpenSimilar }: Props) {
+export default function Lightbox({ ids, index, onIndexChange, onClose, onOpenPerson, onOpenSimilar, canLoadMore, onLoadMore }: Props) {
   const count = ids.length;
   const id = ids[index];
   const hasPrev = index > 0;
-  const hasNext = index < count - 1;
+  const hasNext = index < count - 1 || !!canLoadMore;
+
+  // When advancing past the last loaded image, ask the host to load the next
+  // page, then step forward once it arrives.
+  const [wantNext, setWantNext] = useState(false);
+  const goNext = () => {
+    if (index < count - 1) onIndexChange(index + 1);
+    else if (canLoadMore && onLoadMore) {
+      setWantNext(true);
+      onLoadMore();
+    }
+  };
+  useEffect(() => {
+    if (wantNext && index < count - 1) {
+      onIndexChange(index + 1);
+      setWantNext(false);
+    }
+  }, [count, wantNext, index, onIndexChange]);
 
   // Who is in this photo (named first). Fetched per-id so the viewer is
   // self-contained no matter which screen opened it.
@@ -64,11 +84,12 @@ export default function Lightbox({ ids, index, onIndexChange, onClose, onOpenPer
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") onClose();
       else if (e.key === "ArrowLeft" && index > 0) onIndexChange(index - 1);
-      else if (e.key === "ArrowRight" && index < count - 1) onIndexChange(index + 1);
+      else if (e.key === "ArrowRight") goNext();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [onClose, onIndexChange, index, count]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [onClose, onIndexChange, index, count, canLoadMore]);
 
   if (id == null) return null;
 
@@ -107,7 +128,7 @@ export default function Lightbox({ ids, index, onIndexChange, onClose, onOpenPer
           data-testid="lightbox-next"
           onClick={(e) => {
             e.stopPropagation();
-            onIndexChange(index + 1);
+            goNext();
           }}
           className="fixed right-4 top-1/2 -translate-y-1/2 w-11 h-11 rounded-full bg-[#171922]/80 backdrop-blur-md border border-white/10 text-on-surface hover:text-white hover:border-white/30 flex items-center justify-center transition-all"
         >
