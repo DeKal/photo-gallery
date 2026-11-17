@@ -9,11 +9,13 @@ from sqlalchemy.orm import Session
 from app.db import get_session
 from app.models import Face, FacePerson, Person, Photo
 from app.schemas import (
+    FaceOut,
     MergeRequest,
     MoveFacesRequest,
     PersonOut,
     PhotoOut,
     RenameRequest,
+    SetCoverRequest,
 )
 
 router = APIRouter()
@@ -136,6 +138,63 @@ def list_person_photos(
         .all()
     )
     return list(photos)
+
+
+@router.get("/persons/{person_id}/faces", response_model=list[FaceOut])
+def list_person_faces(
+    person_id: int, session: Session = Depends(get_session)
+) -> list[FaceOut]:
+    """Member faces of a person, best (highest det_score) first.
+
+    Used by the UI to offer alternative cover faces to choose from.
+    """
+    person = session.get(Person, person_id)
+    if person is None:
+        raise HTTPException(status_code=404, detail="person not found")
+
+    faces = (
+        session.execute(
+            select(Face)
+            .join(FacePerson, FacePerson.face_id == Face.id)
+            .where(FacePerson.person_id == person_id)
+            .order_by(Face.det_score.desc(), Face.id)
+        )
+        .scalars()
+        .all()
+    )
+    return [
+        FaceOut(
+            id=f.id,
+            photo_id=f.photo_id,
+            det_score=f.det_score,
+            thumb_path=f.thumb_path,
+            is_cover=(f.id == person.cover_face_id),
+        )
+        for f in faces
+    ]
+
+
+@router.post("/persons/{person_id}/cover", response_model=PersonOut)
+def set_person_cover(
+    person_id: int,
+    body: SetCoverRequest,
+    session: Session = Depends(get_session),
+) -> PersonOut:
+    """Set the person's cover face to one of its member faces."""
+    person = session.get(Person, person_id)
+    if person is None:
+        raise HTTPException(status_code=404, detail="person not found")
+
+    link = session.get(FacePerson, body.face_id)
+    if link is None or link.person_id != person_id:
+        raise HTTPException(
+            status_code=400, detail="face does not belong to this person"
+        )
+
+    person.cover_face_id = body.face_id
+    session.commit()
+    session.refresh(person)
+    return _person_out(session, person)
 
 
 @router.patch("/persons/{person_id}", response_model=PersonOut)

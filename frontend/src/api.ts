@@ -38,6 +38,14 @@ export interface Photo {
   thumb_path: string | null;
 }
 
+export interface Face {
+  id: number;
+  photo_id: number;
+  det_score: number;
+  thumb_path: string | null;
+  is_cover: boolean;
+}
+
 export interface SimCluster {
   id: number;
   label: string | null;
@@ -127,6 +135,17 @@ export function getPerson(id: number): Promise<Person> {
 
 export function getPersonPhotos(id: number): Promise<Photo[]> {
   return request(`/persons/${id}/photos`);
+}
+
+export function getPersonFaces(id: number): Promise<Face[]> {
+  return request(`/persons/${id}/faces`);
+}
+
+export function setPersonCover(id: number, faceId: number): Promise<Person> {
+  return request(`/persons/${id}/cover`, {
+    method: "POST",
+    body: JSON.stringify({ face_id: faceId }),
+  });
 }
 
 export function renamePerson(id: number, name: string): Promise<Person> {

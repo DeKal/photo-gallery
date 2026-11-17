@@ -72,6 +72,22 @@ class RenameRequest(BaseModel):
     name: str
 
 
+class FaceOut(BaseModel):
+    """A single detected face belonging to a person."""
+
+    id: int
+    photo_id: int
+    det_score: float
+    thumb_path: Optional[str] = None
+    is_cover: bool = False
+
+
+class SetCoverRequest(BaseModel):
+    """Request body for ``POST /persons/{id}/cover``."""
+
+    face_id: int
+
+
 class MergeRequest(BaseModel):
     """Request body for ``POST /persons/merge``."""
 

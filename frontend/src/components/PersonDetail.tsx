@@ -2,12 +2,15 @@ import { useEffect, useState } from "react";
 import {
   getPerson,
   getPersonPhotos,
+  getPersonFaces,
+  setPersonCover,
   renamePerson,
   faceThumbUrl,
   thumbUrl,
   imageUrl,
   type Person,
   type Photo,
+  type Face,
 } from "../api";
 import ImgWithFallback from "./ImgWithFallback";
 import Lightbox from "./Lightbox";
@@ -41,18 +44,25 @@ const photoPlaceholder = (
 export default function PersonDetail({ personId, onBack, onChanged }: Props) {
   const [person, setPerson] = useState<Person | null>(null);
   const [photos, setPhotos] = useState<Photo[]>([]);
+  const [faces, setFaces] = useState<Face[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [name, setName] = useState("");
   const [saving, setSaving] = useState(false);
+  const [settingCover, setSettingCover] = useState(false);
   const [lightbox, setLightbox] = useState<number | null>(null);
 
   useEffect(() => {
     setLoading(true);
-    Promise.all([getPerson(personId), getPersonPhotos(personId)])
-      .then(([p, ph]) => {
+    Promise.all([
+      getPerson(personId),
+      getPersonPhotos(personId),
+      getPersonFaces(personId),
+    ])
+      .then(([p, ph, fc]) => {
         setPerson(p);
         setPhotos(ph);
+        setFaces(fc);
         setError(null);
       })
       .catch((e) => setError(e instanceof Error ? e.message : String(e)))
@@ -68,6 +78,23 @@ export default function PersonDetail({ personId, onBack, onChanged }: Props) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function chooseCover(faceId: number) {
+    if (person?.cover_face_id === faceId) return;
+    setSettingCover(true);
+    try {
+      const updated = await setPersonCover(personId, faceId);
+      setPerson(updated);
+      setFaces((prev) =>
+        prev.map((f) => ({ ...f, is_cover: f.id === faceId }))
+      );
+      onChanged(); // Refresh the People grid cover.
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setSettingCover(false);
     }
   }
 
@@ -126,6 +153,34 @@ export default function PersonDetail({ personId, onBack, onChanged }: Props) {
               {person.face_count === 1 ? "face" : "faces"} ·{" "}
               {photos.length} {photos.length === 1 ? "photo" : "photos"}
             </div>
+          </div>
+        </div>
+      )}
+
+      {faces.length > 1 && (
+        <div className="face-picker" data-testid="face-picker">
+          <div className="face-picker-label">
+            Cover face <span className="hint">· click to choose</span>
+          </div>
+          <div className="face-strip">
+            {faces.map((f) => (
+              <button
+                key={f.id}
+                type="button"
+                className={`face-chip ${f.is_cover ? "is-cover" : ""}`}
+                data-testid="face-chip"
+                title={`score ${f.det_score.toFixed(2)}`}
+                disabled={settingCover}
+                onClick={() => void chooseCover(f.id)}
+              >
+                <ImgWithFallback
+                  className="thumb"
+                  sources={[faceThumbUrl(f.id)]}
+                  alt={`Face ${f.id}`}
+                  placeholder={facePlaceholder}
+                />
+              </button>
+            ))}
           </div>
         </div>
       )}
