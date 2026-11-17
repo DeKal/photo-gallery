@@ -1,7 +1,7 @@
 from datetime import datetime
 
 from pgvector.sqlalchemy import Vector
-from sqlalchemy import ARRAY, Float, ForeignKey, String
+from sqlalchemy import ARRAY, Boolean, Float, ForeignKey, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db import Base
@@ -48,6 +48,10 @@ class Person(Base):
     name: Mapped[str | None] = mapped_column(String, nullable=True)
     cover_face_id: Mapped[int | None] = mapped_column(
         ForeignKey("faces.id"), nullable=True
+    )
+    # Soft-hide for bad/junk clusters; filtered from the default People list.
+    hidden: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="false"
     )
 
 

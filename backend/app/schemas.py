@@ -36,6 +36,7 @@ class PersonOut(BaseModel):
     cover_face_id: Optional[int] = None
     cover_photo_id: Optional[int] = None
     face_count: int
+    hidden: bool = False
 
 
 class PhotoOut(BaseModel):

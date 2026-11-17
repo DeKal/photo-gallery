@@ -309,6 +309,51 @@
   cursor: pointer;
 }
 
+/* Hide/unhide pill, top-right of a person card. Revealed on hover. */
+.card-hide {
+  position: absolute;
+  top: 0.6rem;
+  right: 0.6rem;
+  z-index: 3;
+  padding: 0.3rem 0.7rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  border-radius: 999px;
+  background: rgba(5, 6, 10, 0.72);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  backdrop-filter: blur(6px);
+  opacity: 0;
+  transform: translateY(-4px);
+  transition: opacity 0.18s ease, transform 0.18s ease, background 0.18s ease;
+}
+
+.card:hover .card-hide,
+.card-hide:focus-visible {
+  opacity: 1;
+  transform: none;
+}
+
+.card-hide:hover:not(:disabled) {
+  background: var(--danger);
+  border-color: var(--danger);
+}
+
+.card-hide:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* A hidden person's card reads as muted; its Unhide pill stays visible. */
+.card.is-hidden .thumb {
+  filter: grayscale(0.6) brightness(0.7);
+}
+
+.card.is-hidden .card-hide {
+  opacity: 1;
+  transform: none;
+}
+
 .photo-tile {
   cursor: pointer;
   position: relative;

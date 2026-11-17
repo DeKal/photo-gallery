@@ -2,6 +2,8 @@ import { useCallback, useEffect, useState } from "react";
 import {
   getPersons,
   mergePersons,
+  hidePerson,
+  unhidePerson,
   faceThumbUrl,
   thumbUrl,
   type Person,
@@ -23,21 +25,24 @@ export default function PeopleGrid() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [openId, setOpenId] = useState<number | null>(null);
+  const [showHidden, setShowHidden] = useState(false);
 
   const [selectMode, setSelectMode] = useState(false);
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [merging, setMerging] = useState(false);
+  // Ids with a hide/unhide request in flight, to disable the button.
+  const [busy, setBusy] = useState<Set<number>>(new Set());
 
   const load = useCallback(() => {
     setLoading(true);
-    getPersons()
+    getPersons(showHidden)
       .then((p) => {
         setPersons(p);
         setError(null);
       })
       .catch((e) => setError(e instanceof Error ? e.message : String(e)))
       .finally(() => setLoading(false));
-  }, []);
+  }, [showHidden]);
 
   useEffect(() => {
     load();
@@ -68,6 +73,29 @@ export default function PeopleGrid() {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
       setMerging(false);
+    }
+  }
+
+  async function toggleHidden(p: Person) {
+    setBusy((prev) => new Set(prev).add(p.id));
+    try {
+      if (p.hidden) await unhidePerson(p.id);
+      else await hidePerson(p.id);
+      // Reflect the change locally: when the list excludes hidden, drop the
+      // card; otherwise flip its flag in place.
+      setPersons((prev) =>
+        showHidden
+          ? prev.map((x) => (x.id === p.id ? { ...x, hidden: !x.hidden } : x))
+          : prev.filter((x) => x.id !== p.id)
+      );
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setBusy((prev) => {
+        const next = new Set(prev);
+        next.delete(p.id);
+        return next;
+      });
     }
   }
 
@@ -102,6 +130,12 @@ export default function PeopleGrid() {
           </>
         )}
         <div className="spacer" />
+        <button
+          className={showHidden ? "active" : ""}
+          onClick={() => setShowHidden((v) => !v)}
+        >
+          {showHidden ? "Hide hidden" : "Show hidden"}
+        </button>
         <button onClick={load} disabled={loading}>
           Refresh
         </button>
@@ -110,14 +144,20 @@ export default function PeopleGrid() {
       {error && <div className="error-text">{error}</div>}
       {loading && <div className="loading">Loading people…</div>}
       {!loading && persons.length === 0 && (
-        <div className="empty">No people yet. Scan a folder to get started.</div>
+        <div className="empty">
+          {showHidden
+            ? "No hidden people."
+            : "No people yet. Scan a folder to get started."}
+        </div>
       )}
 
       <div className="grid">
         {persons.map((p) => (
           <div
             key={p.id}
-            className={`card ${selected.has(p.id) ? "selected" : ""}`}
+            className={`card ${selected.has(p.id) ? "selected" : ""} ${
+              p.hidden ? "is-hidden" : ""
+            }`}
             data-testid="person-card"
             onClick={() => (selectMode ? toggle(p.id) : setOpenId(p.id))}
           >
@@ -129,6 +169,20 @@ export default function PeopleGrid() {
                 onChange={() => toggle(p.id)}
                 onClick={(e) => e.stopPropagation()}
               />
+            )}
+            {!selectMode && (
+              <button
+                className="card-hide"
+                data-testid="person-hide-btn"
+                title={p.hidden ? "Unhide this person" : "Hide this person"}
+                disabled={busy.has(p.id)}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  void toggleHidden(p);
+                }}
+              >
+                {p.hidden ? "Unhide" : "Hide"}
+              </button>
             )}
             {p.cover_face_id != null || p.cover_photo_id != null ? (
               <ImgWithFallback
@@ -147,6 +201,7 @@ export default function PeopleGrid() {
               <div className="card-title">{p.name ?? "Unnamed"}</div>
               <div className="card-sub">
                 {p.face_count} {p.face_count === 1 ? "face" : "faces"}
+                {p.hidden ? " · hidden" : ""}
               </div>
             </div>
           </div>

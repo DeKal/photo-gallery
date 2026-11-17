@@ -29,7 +29,8 @@ CREATE TABLE IF NOT EXISTS faces (
 CREATE TABLE IF NOT EXISTS persons (
     id SERIAL PRIMARY KEY,
     name TEXT,
-    cover_face_id INTEGER REFERENCES faces(id)
+    cover_face_id INTEGER REFERENCES faces(id),
+    hidden BOOLEAN NOT NULL DEFAULT FALSE
 );
 
 CREATE TABLE IF NOT EXISTS face_person (

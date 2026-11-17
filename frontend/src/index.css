@@ -90,6 +90,13 @@ button:active:not(:disabled) {
   transform: translateY(1px);
 }
 
+/* Toggled-on toolbar button (e.g. "Show hidden"). */
+button.active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent-hover);
+}
+
 button:focus-visible {
   outline: none;
   box-shadow: var(--ring);

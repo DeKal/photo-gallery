@@ -29,6 +29,7 @@ export interface Person {
   cover_face_id: number | null;
   cover_photo_id: number | null;
   face_count: number;
+  hidden: boolean;
 }
 
 export interface Photo {
@@ -108,8 +109,16 @@ export function cluster(): Promise<ClusterResult> {
 
 // ---- Persons -------------------------------------------------------------
 
-export function getPersons(): Promise<Person[]> {
-  return request("/persons");
+export function getPersons(includeHidden = false): Promise<Person[]> {
+  return request(`/persons${includeHidden ? "?include_hidden=true" : ""}`);
+}
+
+export function hidePerson(id: number): Promise<Person> {
+  return request(`/persons/${id}/hide`, { method: "POST" });
+}
+
+export function unhidePerson(id: number): Promise<Person> {
+  return request(`/persons/${id}/unhide`, { method: "POST" });
 }
 
 export function getPerson(id: number): Promise<Person> {

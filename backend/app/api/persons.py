@@ -56,16 +56,51 @@ def _person_out(session: Session, person: Person) -> PersonOut:
         cover_face_id=person.cover_face_id,
         cover_photo_id=_cover_photo_id(session, person),
         face_count=_face_count(session, person.id),
+        hidden=person.hidden,
     )
 
 
 @router.get("/persons", response_model=list[PersonOut])
-def list_persons(session: Session = Depends(get_session)) -> list[PersonOut]:
-    """List all person clusters, ordered by face count descending."""
-    persons = session.execute(select(Person)).scalars().all()
+def list_persons(
+    include_hidden: bool = False, session: Session = Depends(get_session)
+) -> list[PersonOut]:
+    """List person clusters, ordered by face count descending.
+
+    Hidden (soft-hidden) clusters are excluded unless ``include_hidden`` is set.
+    """
+    stmt = select(Person)
+    if not include_hidden:
+        stmt = stmt.where(Person.hidden.is_(False))
+    persons = session.execute(stmt).scalars().all()
     out = [_person_out(session, p) for p in persons]
     out.sort(key=lambda p: p.face_count, reverse=True)
     return out
+
+
+def _set_hidden(session: Session, person_id: int, hidden: bool) -> PersonOut:
+    person = session.get(Person, person_id)
+    if person is None:
+        raise HTTPException(status_code=404, detail="person not found")
+    person.hidden = hidden
+    session.commit()
+    session.refresh(person)
+    return _person_out(session, person)
+
+
+@router.post("/persons/{person_id}/hide", response_model=PersonOut)
+def hide_person(
+    person_id: int, session: Session = Depends(get_session)
+) -> PersonOut:
+    """Soft-hide a person cluster (e.g. a bad classification)."""
+    return _set_hidden(session, person_id, True)
+
+
+@router.post("/persons/{person_id}/unhide", response_model=PersonOut)
+def unhide_person(
+    person_id: int, session: Session = Depends(get_session)
+) -> PersonOut:
+    """Restore a previously hidden person cluster."""
+    return _set_hidden(session, person_id, False)
 
 
 @router.get("/persons/{person_id}", response_model=PersonOut)
