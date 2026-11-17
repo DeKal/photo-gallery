@@ -98,6 +98,7 @@ export default function SimilarGrid({
   const [error, setError] = useState<string | null>(null);
   const [view, setView] = useState<View>({ kind: "clusters" });
   const [lightbox, setLightbox] = useState<{ ids: number[]; index: number } | null>(null);
+  const [query, setQuery] = useState("");
 
   useEffect(() => {
     setLoading(true);
@@ -164,12 +165,37 @@ export default function SimilarGrid({
     );
   }
 
+  const q = query.trim().toLowerCase();
+  const visible = q
+    ? clusters.filter(
+        (c) =>
+          (c.label ?? "").toLowerCase().includes(q) ||
+          c.person_names.some((n) => n.toLowerCase().includes(q))
+      )
+    : clusters;
+
   return (
     <section className={SECTION}>
-      <div className="flex items-center justify-between mb-space-lg">
+      <div className="flex items-center justify-between gap-space-md mb-space-lg flex-wrap">
         <span className="font-body-md text-body-md text-on-surface-variant font-medium">
-          {clusters.length} similar {clusters.length === 1 ? "set" : "sets"}
+          {q ? `${visible.length} of ${clusters.length}` : clusters.length} similar {clusters.length === 1 ? "set" : "sets"}
         </span>
+        <div className="flex items-center bg-surface-container border border-outline-variant/60 rounded-xl px-3 h-11 focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20 transition-all">
+          <Icon name="search" className="text-outline text-base mr-1.5" />
+          <input
+            type="text"
+            data-testid="sim-search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Filter sets by person name…"
+            className="w-44 sm:w-56 bg-transparent text-on-surface text-body-sm font-body-sm outline-none border-none p-0 focus:ring-0 placeholder:text-outline"
+          />
+          {query && (
+            <button className="ml-1 text-outline hover:text-on-surface" title="Clear filter" onClick={() => setQuery("")}>
+              <Icon name="close" className="text-sm" />
+            </button>
+          )}
+        </div>
       </div>
 
       {error && (
@@ -182,9 +208,12 @@ export default function SimilarGrid({
       {!loading && clusters.length === 0 && (
         <div className="text-outline py-12 text-center">No similarity clusters yet. Scan a folder to get started.</div>
       )}
+      {!loading && clusters.length > 0 && visible.length === 0 && (
+        <div className="text-outline py-12 text-center">No sets contain a person matching “{query}”.</div>
+      )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-gutter-lg">
-        {clusters.map((c) => {
+        {visible.map((c) => {
           const label = c.label ?? `Cluster ${c.id}`;
           const unlabeled = !c.label;
           return (

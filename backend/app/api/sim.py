@@ -7,7 +7,15 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.db import get_session
-from app.models import ImageEmbedding, Photo, PhotoSimCluster, SimCluster
+from app.models import (
+    Face,
+    FacePerson,
+    ImageEmbedding,
+    Person,
+    Photo,
+    PhotoSimCluster,
+    SimCluster,
+)
 from app.schemas import PhotoOut, SimClusterOut, SimilarPhoto
 
 router = APIRouter()
@@ -19,7 +27,11 @@ MAX_K = 500
 def list_sim_clusters(
     session: Session = Depends(get_session),
 ) -> list[SimClusterOut]:
-    """List similarity clusters, ordered by photo count descending."""
+    """List similarity clusters, ordered by photo count descending.
+
+    Each cluster carries the distinct names of people appearing in any of its
+    photos, so the UI can filter whole groups by person name.
+    """
     rows = session.execute(
         select(
             SimCluster.id,
@@ -35,12 +47,28 @@ def list_sim_clusters(
         .order_by(func.count(PhotoSimCluster.photo_id).desc())
     ).all()
 
+    # Distinct named people per cluster (across all its photos).
+    name_rows = session.execute(
+        select(PhotoSimCluster.sim_cluster_id, Person.name)
+        .join(Face, Face.photo_id == PhotoSimCluster.photo_id)
+        .join(FacePerson, FacePerson.face_id == Face.id)
+        .join(Person, Person.id == FacePerson.person_id)
+        .where(Person.name.is_not(None))
+        .distinct()
+    ).all()
+    names_by_cluster: dict[int, list[str]] = {}
+    for cluster_id, name in name_rows:
+        names_by_cluster.setdefault(cluster_id, []).append(name)
+    for names in names_by_cluster.values():
+        names.sort()
+
     return [
         SimClusterOut(
             id=cid,
             label=label,
             cover_photo_id=cover_photo_id,
             photo_count=photo_count,
+            person_names=names_by_cluster.get(cid, []),
         )
         for cid, label, cover_photo_id, photo_count in rows
     ]

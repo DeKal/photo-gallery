@@ -53,6 +53,7 @@ export interface SimCluster {
   label: string | null;
   cover_photo_id: number | null;
   photo_count: number;
+  person_names: string[];
 }
 
 export interface SimilarPhoto {

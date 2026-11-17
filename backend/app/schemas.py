@@ -87,6 +87,8 @@ class SimClusterOut(BaseModel):
     label: Optional[str] = None
     cover_photo_id: Optional[int] = None
     photo_count: int
+    # Distinct names of people appearing in the cluster's photos (for filtering).
+    person_names: list[str] = []
 
 
 class SimilarPhoto(BaseModel):
