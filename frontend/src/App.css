@@ -474,6 +474,21 @@
   cursor: default;
 }
 
+.lightbox-stage {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.lightbox-action {
+  position: absolute;
+  bottom: 1rem;
+  left: 50%;
+  transform: translateX(-50%);
+  white-space: nowrap;
+}
+
 .lightbox-close {
   position: fixed;
   top: 1rem;

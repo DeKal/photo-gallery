@@ -10,6 +10,7 @@ import {
   type SimilarPhoto,
 } from "../api";
 import ImgWithFallback from "./ImgWithFallback";
+import Lightbox from "./Lightbox";
 
 const photoPlaceholder = (
   <div className="thumb thumb-placeholder" aria-hidden="true">
@@ -31,6 +32,8 @@ export default function SimilarGrid() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [view, setView] = useState<View>({ kind: "clusters" });
+  // Full-resolution photo currently open in the lightbox (shared by all views).
+  const [lightbox, setLightbox] = useState<number | null>(null);
 
   useEffect(() => {
     setLoading(true);
@@ -43,31 +46,48 @@ export default function SimilarGrid() {
       .finally(() => setLoading(false));
   }, []);
 
+  const lb =
+    lightbox != null ? (
+      <Lightbox
+        src={imageUrl(lightbox)}
+        alt={`Photo ${lightbox}`}
+        actionLabel="More like this"
+        onAction={() => {
+          const from = view.kind === "cluster" ? view.cluster : null;
+          setView({ kind: "similar", photoId: lightbox, from });
+          setLightbox(null);
+        }}
+        onClose={() => setLightbox(null)}
+      />
+    ) : null;
+
   if (view.kind === "cluster") {
     return (
-      <ClusterPhotos
-        cluster={view.cluster}
-        onBack={() => setView({ kind: "clusters" })}
-        onPhoto={(photoId) =>
-          setView({ kind: "similar", photoId, from: view.cluster })
-        }
-      />
+      <>
+        <ClusterPhotos
+          cluster={view.cluster}
+          onBack={() => setView({ kind: "clusters" })}
+          onOpen={setLightbox}
+        />
+        {lb}
+      </>
     );
   }
 
   if (view.kind === "similar") {
     return (
-      <SimilarPanel
-        photoId={view.photoId}
-        onBack={() =>
-          view.from
-            ? setView({ kind: "cluster", cluster: view.from })
-            : setView({ kind: "clusters" })
-        }
-        onPhoto={(photoId) =>
-          setView({ kind: "similar", photoId, from: view.from })
-        }
-      />
+      <>
+        <SimilarPanel
+          photoId={view.photoId}
+          onBack={() =>
+            view.from
+              ? setView({ kind: "cluster", cluster: view.from })
+              : setView({ kind: "clusters" })
+          }
+          onOpen={setLightbox}
+        />
+        {lb}
+      </>
     );
   }
 
@@ -114,11 +134,11 @@ export default function SimilarGrid() {
 function ClusterPhotos({
   cluster,
   onBack,
-  onPhoto,
+  onOpen,
 }: {
   cluster: SimCluster;
   onBack: () => void;
-  onPhoto: (photoId: number) => void;
+  onOpen: (photoId: number) => void;
 }) {
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [loading, setLoading] = useState(true);
@@ -140,7 +160,7 @@ function ClusterPhotos({
       <div className="detail-header">
         <button onClick={onBack}>← Back</button>
         <h2>{cluster.label ?? `Cluster ${cluster.id}`}</h2>
-        <span className="hint">Click a photo to find more like it</span>
+        <span className="hint">Click a photo to view it</span>
       </div>
       {error && <div className="error-text">{error}</div>}
       {loading && <div className="loading">Loading photos…</div>}
@@ -150,7 +170,7 @@ function ClusterPhotos({
             key={photo.id}
             className="photo-tile"
             data-testid="cluster-photo"
-            onClick={() => onPhoto(photo.id)}
+            onClick={() => onOpen(photo.id)}
           >
             <ImgWithFallback
               className="thumb"
@@ -168,11 +188,11 @@ function ClusterPhotos({
 function SimilarPanel({
   photoId,
   onBack,
-  onPhoto,
+  onOpen,
 }: {
   photoId: number;
   onBack: () => void;
-  onPhoto: (photoId: number) => void;
+  onOpen: (photoId: number) => void;
 }) {
   const [results, setResults] = useState<SimilarPhoto[]>([]);
   const [loading, setLoading] = useState(true);
@@ -195,16 +215,7 @@ function SimilarPanel({
       <div className="detail-header">
         <button onClick={onBack}>← Back</button>
         <h2>More like this</h2>
-      </div>
-
-      <div className="hero">
-        <img
-          src={imageUrl(photoId)}
-          alt={`Photo ${photoId}`}
-          onError={(e) => {
-            e.currentTarget.style.display = "none";
-          }}
-        />
+        <span className="hint">Click a photo to view it</span>
       </div>
 
       <div className="more-like-this" data-testid="more-like-this">
@@ -218,7 +229,7 @@ function SimilarPanel({
             <div
               key={r.photo_id}
               className="photo-tile"
-              onClick={() => onPhoto(r.photo_id)}
+              onClick={() => onOpen(r.photo_id)}
             >
               <ImgWithFallback
                 className="thumb"
