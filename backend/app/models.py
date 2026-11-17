@@ -38,6 +38,7 @@ class Face(Base):
     bbox: Mapped[list[float]] = mapped_column(ARRAY(Float))
     det_score: Mapped[float] = mapped_column(Float)
     vec: Mapped[list[float]] = mapped_column(Vector(512))
+    thumb_path: Mapped[str | None] = mapped_column(String, nullable=True)
 
 
 class Person(Base):

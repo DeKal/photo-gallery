@@ -1,9 +1,9 @@
 /* ---- Layout -------------------------------------------------------------- */
 
 .app {
-  max-width: 1240px;
+  max-width: 1280px;
   margin: 0 auto;
-  padding: 0 1.25rem 4rem;
+  padding: 0 1.5rem 5rem;
 }
 
 .topbar {
@@ -13,31 +13,31 @@
   background: rgba(11, 13, 18, 0.72);
   backdrop-filter: saturate(1.4) blur(12px);
   -webkit-backdrop-filter: saturate(1.4) blur(12px);
-  padding: 1rem 0 0.6rem;
+  padding: 1.5rem 0 0.75rem;
   border-bottom: 1px solid var(--border);
 }
 
 .topbar h1 {
-  margin: 0 0 0.85rem;
-  font-size: 1.4rem;
+  margin: 0 0 1.1rem;
+  font-size: 1.7rem;
   font-weight: 700;
   display: flex;
   align-items: center;
-  gap: 0.55rem;
+  gap: 0.65rem;
 }
 
 .topbar h1 .logo {
-  width: 28px;
-  height: 28px;
-  border-radius: 8px;
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
   background: linear-gradient(140deg, var(--accent-hover), var(--accent));
-  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
+  box-shadow: 0 4px 14px rgba(99, 102, 241, 0.45);
   flex: none;
 }
 
 .topbar h1 .sub {
   font-family: var(--font-body);
-  font-size: 0.8rem;
+  font-size: 0.85rem;
   font-weight: 500;
   color: var(--muted);
   letter-spacing: 0;
@@ -179,28 +179,28 @@
 
 .grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
-  gap: 0.9rem;
-  margin-top: 1.25rem;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1.5rem;
+  margin-top: 1.5rem;
 }
 
 /* Gentle staggered entrance for grid items. */
 .grid > * {
-  animation: fade-up 0.4s ease both;
+  animation: fade-up 0.45s ease both;
 }
 .grid > *:nth-child(1) { animation-delay: 0.02s; }
-.grid > *:nth-child(2) { animation-delay: 0.05s; }
-.grid > *:nth-child(3) { animation-delay: 0.08s; }
-.grid > *:nth-child(4) { animation-delay: 0.11s; }
-.grid > *:nth-child(5) { animation-delay: 0.14s; }
-.grid > *:nth-child(6) { animation-delay: 0.17s; }
-.grid > *:nth-child(7) { animation-delay: 0.2s; }
-.grid > *:nth-child(8) { animation-delay: 0.23s; }
+.grid > *:nth-child(2) { animation-delay: 0.06s; }
+.grid > *:nth-child(3) { animation-delay: 0.1s; }
+.grid > *:nth-child(4) { animation-delay: 0.14s; }
+.grid > *:nth-child(5) { animation-delay: 0.18s; }
+.grid > *:nth-child(6) { animation-delay: 0.22s; }
+.grid > *:nth-child(7) { animation-delay: 0.26s; }
+.grid > *:nth-child(8) { animation-delay: 0.3s; }
 
 @keyframes fade-up {
   from {
     opacity: 0;
-    transform: translateY(10px) scale(0.98);
+    transform: translateY(14px) scale(0.98);
   }
   to {
     opacity: 1;
@@ -210,11 +210,12 @@
 
 .thumb {
   width: 100%;
-  aspect-ratio: 1 / 1;
+  aspect-ratio: 4 / 5;
   object-fit: cover;
   display: block;
   background: var(--surface-2);
   border-radius: var(--radius);
+  transition: transform 0.4s cubic-bezier(0.2, 0.7, 0.2, 1);
 }
 
 .thumb-placeholder {
@@ -230,26 +231,35 @@
 }
 
 .thumb-placeholder svg {
-  width: 44%;
-  height: 44%;
+  width: 38%;
+  height: 38%;
 }
 
+/* Cards: big photo tile with the label overlaid on a gradient scrim. */
 .card {
   background: var(--surface);
   border: 1px solid var(--border);
-  border-radius: var(--radius);
+  border-radius: var(--radius-lg);
   overflow: hidden;
   cursor: pointer;
   position: relative;
   box-shadow: var(--shadow-1);
-  transition: box-shadow 0.18s ease, border-color 0.18s ease,
-    transform 0.18s ease;
+  transition: box-shadow 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
+}
+
+.card .thumb {
+  border-radius: 0;
+  aspect-ratio: 4 / 5;
 }
 
 .card:hover {
   box-shadow: var(--shadow-2);
   border-color: var(--border-strong);
-  transform: translateY(-3px);
+  transform: translateY(-4px);
+}
+
+.card:hover .thumb {
+  transform: scale(1.05);
 }
 
 .card.selected {
@@ -257,34 +267,43 @@
   box-shadow: 0 0 0 2px var(--accent), var(--shadow-2);
 }
 
-.card .thumb {
-  border-radius: 0;
-}
-
 .card-body {
-  padding: 0.6rem 0.7rem;
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 2.4rem 1rem 0.9rem;
+  background: linear-gradient(
+    to top,
+    rgba(5, 6, 10, 0.92) 0%,
+    rgba(5, 6, 10, 0.55) 55%,
+    transparent 100%
+  );
+  pointer-events: none;
 }
 
 .card-title {
+  font-family: var(--font-head);
   font-weight: 600;
-  font-size: 0.9rem;
+  font-size: 1.1rem;
+  color: #fff;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .card-sub {
-  font-size: 0.8rem;
-  color: var(--muted);
-  margin-top: 0.1rem;
+  font-size: 0.82rem;
+  color: rgba(255, 255, 255, 0.72);
+  margin-top: 0.15rem;
 }
 
 .card-check {
   position: absolute;
-  top: 0.5rem;
-  left: 0.5rem;
-  width: 20px;
-  height: 20px;
+  top: 0.7rem;
+  left: 0.7rem;
+  width: 22px;
+  height: 22px;
   z-index: 2;
   accent-color: var(--accent);
   cursor: pointer;
@@ -293,26 +312,34 @@
 .photo-tile {
   cursor: pointer;
   position: relative;
-  border-radius: var(--radius);
+  border-radius: var(--radius-lg);
   overflow: hidden;
-  transition: transform 0.18s ease, box-shadow 0.18s ease;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.photo-tile .thumb {
+  aspect-ratio: 1 / 1;
 }
 
 .photo-tile:hover {
-  transform: translateY(-3px);
+  transform: translateY(-4px);
   box-shadow: var(--shadow-2);
+}
+
+.photo-tile:hover .thumb {
+  transform: scale(1.05);
 }
 
 .photo-tile .distance {
   position: absolute;
-  bottom: 0.4rem;
-  right: 0.4rem;
+  bottom: 0.5rem;
+  right: 0.5rem;
   background: rgba(0, 0, 0, 0.65);
   backdrop-filter: blur(4px);
   color: #fff;
-  font-size: 0.7rem;
+  font-size: 0.72rem;
   font-weight: 600;
-  padding: 0.12rem 0.4rem;
+  padding: 0.14rem 0.45rem;
   border-radius: 999px;
 }
 
@@ -373,4 +400,45 @@
   border-radius: var(--radius);
   border: 1px solid var(--border);
   box-shadow: var(--shadow-2);
+}
+
+/* ---- Person detail hero (face crop + name) ------------------------------- */
+
+.person-hero {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-top: 1.25rem;
+  padding: 1rem;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-1);
+}
+
+.person-hero-face {
+  width: 96px;
+  height: 96px;
+  flex: none;
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.person-hero-face .thumb {
+  width: 96px;
+  height: 96px;
+  aspect-ratio: 1 / 1;
+  border-radius: var(--radius);
+}
+
+.person-hero-name {
+  font-family: var(--font-head);
+  font-weight: 600;
+  font-size: 1.3rem;
+}
+
+.person-hero-sub {
+  color: var(--muted);
+  font-size: 0.9rem;
+  margin-top: 0.2rem;
 }

@@ -22,7 +22,8 @@ CREATE TABLE IF NOT EXISTS faces (
     photo_id INTEGER NOT NULL REFERENCES photos(id),
     bbox REAL[],
     det_score DOUBLE PRECISION,
-    vec vector(512)
+    vec vector(512),
+    thumb_path TEXT
 );
 
 CREATE TABLE IF NOT EXISTS persons (

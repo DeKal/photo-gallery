@@ -2,10 +2,21 @@ import { useCallback, useEffect, useState } from "react";
 import {
   getPersons,
   mergePersons,
+  faceThumbUrl,
   thumbUrl,
   type Person,
 } from "../api";
+import ImgWithFallback from "./ImgWithFallback";
 import PersonDetail from "./PersonDetail";
+
+const personPlaceholder = (
+  <div className="thumb thumb-placeholder" aria-hidden="true">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+      <circle cx="12" cy="8" r="4" />
+      <path d="M4 20c0-3.3 3.6-6 8-6s8 2.7 8 6" strokeLinecap="round" />
+    </svg>
+  </div>
+);
 
 export default function PeopleGrid() {
   const [persons, setPersons] = useState<Person[]>([]);
@@ -119,20 +130,18 @@ export default function PeopleGrid() {
                 onClick={(e) => e.stopPropagation()}
               />
             )}
-            {p.cover_photo_id != null ? (
-              <img
+            {p.cover_face_id != null || p.cover_photo_id != null ? (
+              <ImgWithFallback
                 className="thumb"
-                src={thumbUrl(p.cover_photo_id)}
+                sources={[
+                  p.cover_face_id != null ? faceThumbUrl(p.cover_face_id) : null,
+                  p.cover_photo_id != null ? thumbUrl(p.cover_photo_id) : null,
+                ].filter((s): s is string => s != null)}
                 alt={p.name ?? "Unnamed"}
-                loading="lazy"
+                placeholder={personPlaceholder}
               />
             ) : (
-              <div className="thumb thumb-placeholder" aria-hidden="true">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                  <circle cx="12" cy="8" r="4" />
-                  <path d="M4 20c0-3.3 3.6-6 8-6s8 2.7 8 6" strokeLinecap="round" />
-                </svg>
-              </div>
+              personPlaceholder
             )}
             <div className="card-body">
               <div className="card-title">{p.name ?? "Unnamed"}</div>

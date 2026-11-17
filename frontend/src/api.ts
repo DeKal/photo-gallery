@@ -77,6 +77,10 @@ export function thumbUrl(photoId: number): string {
   return `${BASE}/thumb/${photoId}`;
 }
 
+export function faceThumbUrl(faceId: number): string {
+  return `${BASE}/face-thumb/${faceId}`;
+}
+
 export function imageUrl(photoId: number): string {
   return `${BASE}/image/${photoId}`;
 }
@@ -106,6 +110,10 @@ export function cluster(): Promise<ClusterResult> {
 
 export function getPersons(): Promise<Person[]> {
   return request("/persons");
+}
+
+export function getPerson(id: number): Promise<Person> {
+  return request(`/persons/${id}`);
 }
 
 export function getPersonPhotos(id: number): Promise<Photo[]> {

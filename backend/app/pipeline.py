@@ -22,6 +22,7 @@ from app.scanner import (
     file_sha256,
     iter_images,
     load_image,
+    make_face_thumbnail,
     make_thumbnail,
 )
 
@@ -103,14 +104,18 @@ def _process_file(session, path) -> None:
     session.add(ImageEmbedding(photo_id=photo.id, vec=vec.tolist()))
 
     for face in detect_faces(img):
-        session.add(
-            Face(
-                photo_id=photo.id,
-                bbox=face["bbox"],
-                det_score=face["det_score"],
-                vec=face["vec"].tolist(),
-            )
+        face_row = Face(
+            photo_id=photo.id,
+            bbox=face["bbox"],
+            det_score=face["det_score"],
+            vec=face["vec"].tolist(),
         )
+        session.add(face_row)
+        session.flush()  # Assigns face_row.id for the crop filename.
+        thumb_path = make_face_thumbnail(
+            img, face["bbox"], settings.thumb_dir, face_row.id
+        )
+        face_row.thumb_path = str(thumb_path)
 
 
 def _record_error(session, path, exc: Exception) -> None:

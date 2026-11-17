@@ -9,6 +9,17 @@ import {
   type Photo,
   type SimilarPhoto,
 } from "../api";
+import ImgWithFallback from "./ImgWithFallback";
+
+const photoPlaceholder = (
+  <div className="thumb thumb-placeholder" aria-hidden="true">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+      <rect x="3" y="4" width="18" height="16" rx="2" />
+      <circle cx="8.5" cy="9.5" r="1.5" />
+      <path d="M4 17l5-5 4 4 3-3 4 4" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  </div>
+);
 
 type View =
   | { kind: "clusters" }
@@ -78,14 +89,14 @@ export default function SimilarGrid() {
             onClick={() => setView({ kind: "cluster", cluster: c })}
           >
             {c.cover_photo_id != null ? (
-              <img
+              <ImgWithFallback
                 className="thumb"
-                src={thumbUrl(c.cover_photo_id)}
+                sources={[thumbUrl(c.cover_photo_id)]}
                 alt={c.label ?? `Cluster ${c.id}`}
-                loading="lazy"
+                placeholder={photoPlaceholder}
               />
             ) : (
-              <div className="thumb" />
+              photoPlaceholder
             )}
             <div className="card-body">
               <div className="card-title">{c.label ?? `Cluster ${c.id}`}</div>
@@ -141,11 +152,11 @@ function ClusterPhotos({
             data-testid="cluster-photo"
             onClick={() => onPhoto(photo.id)}
           >
-            <img
+            <ImgWithFallback
               className="thumb"
-              src={thumbUrl(photo.id)}
+              sources={[thumbUrl(photo.id)]}
               alt={photo.path}
-              loading="lazy"
+              placeholder={photoPlaceholder}
             />
           </div>
         ))}
@@ -187,7 +198,13 @@ function SimilarPanel({
       </div>
 
       <div className="hero">
-        <img src={imageUrl(photoId)} alt={`Photo ${photoId}`} />
+        <img
+          src={imageUrl(photoId)}
+          alt={`Photo ${photoId}`}
+          onError={(e) => {
+            e.currentTarget.style.display = "none";
+          }}
+        />
       </div>
 
       <div className="more-like-this" data-testid="more-like-this">
@@ -203,11 +220,11 @@ function SimilarPanel({
               className="photo-tile"
               onClick={() => onPhoto(r.photo_id)}
             >
-              <img
+              <ImgWithFallback
                 className="thumb"
-                src={thumbUrl(r.photo_id)}
+                sources={[thumbUrl(r.photo_id)]}
                 alt={`Photo ${r.photo_id}`}
-                loading="lazy"
+                placeholder={photoPlaceholder}
               />
               <span className="distance">{r.distance.toFixed(3)}</span>
             </div>

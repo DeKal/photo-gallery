@@ -1,10 +1,14 @@
 import { useEffect, useState } from "react";
 import {
+  getPerson,
   getPersonPhotos,
   renamePerson,
+  faceThumbUrl,
   thumbUrl,
+  type Person,
   type Photo,
 } from "../api";
+import ImgWithFallback from "./ImgWithFallback";
 
 interface Props {
   personId: number;
@@ -13,7 +17,27 @@ interface Props {
   onChanged: () => void;
 }
 
+const facePlaceholder = (
+  <div className="thumb thumb-placeholder" aria-hidden="true">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+      <circle cx="12" cy="8" r="4" />
+      <path d="M4 20c0-3.3 3.6-6 8-6s8 2.7 8 6" strokeLinecap="round" />
+    </svg>
+  </div>
+);
+
+const photoPlaceholder = (
+  <div className="thumb thumb-placeholder" aria-hidden="true">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+      <rect x="3" y="4" width="18" height="16" rx="2" />
+      <circle cx="8.5" cy="9.5" r="1.5" />
+      <path d="M4 17l5-5 4 4 3-3 4 4" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  </div>
+);
+
 export default function PersonDetail({ personId, onBack, onChanged }: Props) {
+  const [person, setPerson] = useState<Person | null>(null);
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -22,9 +46,10 @@ export default function PersonDetail({ personId, onBack, onChanged }: Props) {
 
   useEffect(() => {
     setLoading(true);
-    getPersonPhotos(personId)
-      .then((p) => {
-        setPhotos(p);
+    Promise.all([getPerson(personId), getPersonPhotos(personId)])
+      .then(([p, ph]) => {
+        setPerson(p);
+        setPhotos(ph);
         setError(null);
       })
       .catch((e) => setError(e instanceof Error ? e.message : String(e)))
@@ -42,6 +67,9 @@ export default function PersonDetail({ personId, onBack, onChanged }: Props) {
       setSaving(false);
     }
   }
+
+  const coverSources =
+    person?.cover_face_id != null ? [faceThumbUrl(person.cover_face_id)] : [];
 
   return (
     <div>
@@ -78,6 +106,27 @@ export default function PersonDetail({ personId, onBack, onChanged }: Props) {
         </button>
       </div>
 
+      {person && (
+        <div className="person-hero">
+          <div className="person-hero-face">
+            <ImgWithFallback
+              className="thumb"
+              sources={coverSources}
+              alt={person.name ?? "Unnamed"}
+              placeholder={facePlaceholder}
+            />
+          </div>
+          <div className="person-hero-meta">
+            <div className="person-hero-name">{person.name ?? "Unnamed"}</div>
+            <div className="person-hero-sub">
+              {person.face_count}{" "}
+              {person.face_count === 1 ? "face" : "faces"} ·{" "}
+              {photos.length} {photos.length === 1 ? "photo" : "photos"}
+            </div>
+          </div>
+        </div>
+      )}
+
       {error && <div className="error-text">{error}</div>}
       {loading && <div className="loading">Loading photos…</div>}
       {!loading && photos.length === 0 && (
@@ -86,12 +135,12 @@ export default function PersonDetail({ personId, onBack, onChanged }: Props) {
 
       <div className="grid">
         {photos.map((photo) => (
-          <img
+          <ImgWithFallback
             key={photo.id}
             className="thumb"
-            src={thumbUrl(photo.id)}
+            sources={[thumbUrl(photo.id)]}
             alt={photo.path}
-            loading="lazy"
+            placeholder={photoPlaceholder}
           />
         ))}
       </div>
