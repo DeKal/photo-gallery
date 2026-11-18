@@ -103,8 +103,38 @@ export default function AppShell({ nav, onNav, onImportFolder, children }: Props
           </div>
         </aside>
 
-        <main className="flex-1 flex flex-col overflow-y-auto custom-scroll relative">{children}</main>
+        <main className="flex-1 flex flex-col overflow-y-auto custom-scroll relative pb-16 md:pb-0">{children}</main>
       </div>
+
+      {/* MOBILE BOTTOM NAV — the side rail is md+ only, so phones navigate here. */}
+      <nav className="md:hidden fixed bottom-0 inset-x-0 z-40 flex items-stretch bg-surface-container-low/95 backdrop-blur-lg border-t border-outline-variant pb-[env(safe-area-inset-bottom)]">
+        {NAV.map((item) => {
+          const active = item.key === nav || (item.key === "people" && peopleActive);
+          return (
+            <button
+              key={item.key}
+              onClick={() => onNav(item.key)}
+              aria-label={item.label}
+              className={`flex-1 flex flex-col items-center justify-center gap-0.5 py-2 min-h-[56px] active:scale-[0.97] transition-colors ${
+                active ? "text-primary" : "text-on-surface-variant"
+              }`}
+            >
+              <Icon name={item.icon} className="text-xl" />
+              <span className="text-[10px] font-medium leading-none">{item.label.split(" ")[0]}</span>
+            </button>
+          );
+        })}
+        {onImportFolder && (
+          <button
+            onClick={onImportFolder}
+            aria-label="Import Folder"
+            className="flex-1 flex flex-col items-center justify-center gap-0.5 py-2 min-h-[56px] text-on-surface-variant active:scale-[0.97] transition-colors"
+          >
+            <Icon name="add_circle" className="text-xl text-primary" />
+            <span className="text-[10px] font-medium leading-none">Import</span>
+          </button>
+        )}
+      </nav>
     </div>
   );
 }
