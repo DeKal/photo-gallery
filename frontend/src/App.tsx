@@ -83,34 +83,26 @@ export default function App() {
 
           {/* Segmented mode switch: People vs Similar */}
           <div className={`flex items-center justify-between ${NO_WORKER ? "" : "mt-space-lg border-t border-outline-variant/40 pt-space-md"}`}>
-            <div className="inline-flex p-1 rounded-2xl bg-[#0c0e13] border border-[#232736]">
+            <div className="flex items-center gap-space-md">
               {peopleActive && (
-              <button
-                onClick={() => navigate("/people")}
-                className="flex items-center gap-2 px-space-lg py-1.5 rounded-xl font-label-md text-label-md transition-colors bg-gradient-to-r from-indigo-500 to-violet-600 text-white shadow-md shadow-indigo-500/30"
-              >
-                <Icon name="person" className="text-base" />
-                <span>People</span>
-                {counts.people != null && (
-                  <span className="px-2 py-0.5 rounded-full text-label-sm font-label-sm bg-white/20 text-white">
-                    {counts.people} people
-                  </span>
-                )}
-              </button>
+                <>
+                  <h1 className="text-headline-md font-headline-md font-semibold text-on-surface tracking-tight">People</h1>
+                  {counts.people != null && (
+                    <span className="px-space-sm py-0.5 rounded-full bg-surface-container-high border border-outline-variant/40 text-on-surface-variant text-label-sm font-label-sm">
+                      {counts.people} people
+                    </span>
+                  )}
+                </>
               )}
               {nav === "similar" && (
-              <button
-                onClick={() => navigate("/similar")}
-                className="flex items-center gap-2 px-space-lg py-1.5 rounded-xl font-label-md text-label-md transition-colors bg-gradient-to-r from-indigo-500 to-violet-600 text-white shadow-md shadow-indigo-500/30"
-              >
-                <Icon name="burst_mode" className="text-base" />
-                <span>Similar</span>
-                {counts.similar != null && (
-                  <span className="px-2 py-0.5 rounded-full text-label-sm font-label-sm bg-white/20 text-white">
-                    {counts.similar} sets
-                  </span>
-                )}
-              </button>
+                <>
+                  <h1 className="text-headline-md font-headline-md font-semibold text-on-surface tracking-tight">Similar</h1>
+                  {counts.similar != null && (
+                    <span className="px-space-sm py-0.5 rounded-full bg-surface-container-high border border-outline-variant/40 text-on-surface-variant text-label-sm font-label-sm">
+                      {counts.similar} sets
+                    </span>
+                  )}
+                </>
               )}
             </div>
             <div className="hidden md:flex items-center gap-2 text-outline text-body-sm font-body-sm">
