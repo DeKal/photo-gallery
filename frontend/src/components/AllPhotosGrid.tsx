@@ -183,15 +183,15 @@ export default function AllPhotosGrid({
           </span>
         </div>
 
-        <div className="flex items-center gap-space-sm">
+        <div className="flex flex-wrap items-center gap-space-sm w-full md:w-auto">
           {!album && (
-            <div className="relative">
+            <div className="relative flex-1 min-w-[9rem] md:flex-none">
               <Icon name="collections_bookmark" className="text-[16px] text-outline absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
               <select
                 data-testid="album-filter"
                 value={albumFilter ?? ""}
                 onChange={(e) => setAlbumFilter(e.target.value ? Number(e.target.value) : null)}
-                className="h-11 pl-9 pr-8 appearance-none rounded-xl bg-surface-container border border-outline-variant/60 text-on-surface text-label-md font-label-md hover:bg-surface-container-high focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all cursor-pointer"
+                className="w-full h-11 pl-9 pr-8 appearance-none rounded-xl bg-surface-container border border-outline-variant/60 text-on-surface text-label-md font-label-md hover:bg-surface-container-high focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all cursor-pointer"
               >
                 <option value="">All albums</option>
                 {albums.map((a) => (
@@ -215,7 +215,7 @@ export default function AllPhotosGrid({
             <Icon name={favorites ? "star" : "star_border"} className="text-[16px]" />
             <span>Starred</span>
           </button>
-          <div className="relative w-80 max-w-full">
+          <div className="relative w-full sm:w-80 order-last sm:order-none">
             <Icon name="search" className="text-[18px] text-outline absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
             <input
               type="text"
