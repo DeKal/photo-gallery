@@ -101,6 +101,10 @@ def list_persons(
     Hidden (soft-hidden) clusters are excluded unless ``include_hidden`` is set.
     When ``album`` is given, only persons with at least one face in that album
     are returned, and their counts/covers are scoped to the album.
+
+    Built from a fixed set of bulk queries (counts, first-member photos, cover
+    faces) rather than two per person, so it stays fast over a remote DB (Neon)
+    where per-person round-trips would otherwise time out with many clusters.
     """
     stmt = select(Person)
     if not include_hidden:
@@ -115,7 +119,74 @@ def list_persons(
             )
         )
     persons = session.execute(stmt).scalars().all()
-    out = [_person_out(session, p, album) for p in persons]
+    if not persons:
+        return []
+    ids = [p.id for p in persons]
+
+    # Face count per person (album-scoped), one grouped query.
+    cnt_stmt = select(
+        FacePerson.person_id,
+        func.count(func.distinct(FacePerson.face_id)),
+    ).where(FacePerson.person_id.in_(ids))
+    if album is not None:
+        cnt_stmt = cnt_stmt.join(Face, Face.id == FacePerson.face_id).join(
+            PhotoAlbum, PhotoAlbum.photo_id == Face.photo_id
+        ).where(PhotoAlbum.album_id == album)
+    counts = dict(
+        session.execute(cnt_stmt.group_by(FacePerson.person_id)).all()
+    )
+
+    # First member photo per person (album-scoped), one DISTINCT ON query —
+    # the fallback cover when no cover face is set (or it falls outside album).
+    fm_stmt = (
+        select(FacePerson.person_id, Face.photo_id)
+        .join(Face, Face.id == FacePerson.face_id)
+        .where(FacePerson.person_id.in_(ids))
+    )
+    if album is not None:
+        fm_stmt = fm_stmt.join(
+            PhotoAlbum, PhotoAlbum.photo_id == Face.photo_id
+        ).where(PhotoAlbum.album_id == album)
+    first_member = dict(
+        session.execute(
+            fm_stmt.order_by(FacePerson.person_id, Face.id).distinct(
+                FacePerson.person_id
+            )
+        ).all()
+    )
+
+    # Photo of each explicit cover face (album-scoped so an out-of-album cover
+    # falls back to a member), one query.
+    cover_face_ids = [
+        p.cover_face_id for p in persons if p.cover_face_id is not None
+    ]
+    cover_photo_of_face: dict[int, int] = {}
+    if cover_face_ids:
+        cf_stmt = select(Face.id, Face.photo_id).where(
+            Face.id.in_(cover_face_ids)
+        )
+        if album is not None:
+            cf_stmt = cf_stmt.join(
+                PhotoAlbum, PhotoAlbum.photo_id == Face.photo_id
+            ).where(PhotoAlbum.album_id == album)
+        cover_photo_of_face = dict(session.execute(cf_stmt).all())
+
+    out = [
+        PersonOut(
+            id=p.id,
+            name=p.name,
+            cover_face_id=p.cover_face_id,
+            cover_photo_id=(
+                cover_photo_of_face.get(p.cover_face_id)
+                if p.cover_face_id is not None
+                else None
+            )
+            or first_member.get(p.id),
+            face_count=counts.get(p.id, 0),
+            hidden=p.hidden,
+        )
+        for p in persons
+    ]
     out.sort(key=lambda p: p.face_count, reverse=True)
     return out
 

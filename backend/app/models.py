@@ -19,7 +19,13 @@ class Photo(Base):
     thumb_path: Mapped[str | None] = mapped_column(String, nullable=True)
     # Thumbnail JPEG bytes stored in-DB so media can be served without a shared
     # filesystem (e.g. serverless/Vercel). thumb_path remains for local dev.
-    thumb_data: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)
+    # Deferred: only the /thumb media endpoint reads this bytea (one row at a
+    # time). List queries select the whole Photo entity, and loading thumbnails
+    # for a 60-item page would drag megabytes over the wire — crippling against
+    # a remote DB (Neon). Deferred keeps it out of those selects until accessed.
+    thumb_data: Mapped[bytes | None] = mapped_column(
+        LargeBinary, nullable=True, deferred=True
+    )
     # Drive file id when this photo came from a Google Drive folder; lets the UI
     # display the image straight from Drive and fall back to the local file.
     drive_file_id: Mapped[str | None] = mapped_column(String, nullable=True)
@@ -49,8 +55,11 @@ class Face(Base):
     det_score: Mapped[float] = mapped_column(Float)
     vec: Mapped[list[float]] = mapped_column(Vector(512))
     thumb_path: Mapped[str | None] = mapped_column(String, nullable=True)
-    # Cropped-face JPEG bytes stored in-DB (see Photo.thumb_data).
-    thumb_data: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)
+    # Cropped-face JPEG bytes stored in-DB (see Photo.thumb_data). Deferred for
+    # the same reason: only /face-thumb reads it, one row at a time.
+    thumb_data: Mapped[bytes | None] = mapped_column(
+        LargeBinary, nullable=True, deferred=True
+    )
 
 
 class Person(Base):

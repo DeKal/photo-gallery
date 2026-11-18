@@ -11,7 +11,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import delete, func, insert, select
+from sqlalchemy import delete, func, insert, select, tuple_
 from sqlalchemy.orm import Session
 
 from app.db import get_session
@@ -87,11 +87,72 @@ def _album_out(session: Session, album: Album) -> AlbumOut:
 
 @router.get("/albums", response_model=list[AlbumOut])
 def list_albums(session: Session = Depends(get_session)) -> list[AlbumOut]:
-    """All albums, newest first, each with photo count + cover photo."""
+    """All albums, newest first, each with photo count + cover photo.
+
+    Built from a fixed set of bulk queries (counts, valid stored covers,
+    first-member fallbacks) rather than two per album, so it stays fast over a
+    remote DB (Neon) as the number of albums grows.
+    """
     albums = (
         session.execute(select(Album).order_by(Album.id.desc())).scalars().all()
     )
-    return [_album_out(session, a) for a in albums]
+    if not albums:
+        return []
+    ids = [a.id for a in albums]
+
+    # Photo count per album, one grouped query.
+    counts = dict(
+        session.execute(
+            select(PhotoAlbum.album_id, func.count())
+            .where(PhotoAlbum.album_id.in_(ids))
+            .group_by(PhotoAlbum.album_id)
+        ).all()
+    )
+
+    # Stored covers that are still a non-errored member of their album, one
+    # query keyed on the (album, photo) pairs.
+    stored_pairs = [
+        (a.id, a.cover_photo_id)
+        for a in albums
+        if a.cover_photo_id is not None
+    ]
+    valid_cover: dict[int, tuple[int, str | None]] = {}
+    if stored_pairs:
+        rows = session.execute(
+            select(PhotoAlbum.album_id, Photo.id, Photo.drive_file_id)
+            .join(Photo, Photo.id == PhotoAlbum.photo_id)
+            .where(
+                Photo.error.is_(None),
+                tuple_(PhotoAlbum.album_id, Photo.id).in_(stored_pairs),
+            )
+        ).all()
+        valid_cover = {aid: (pid, drive) for aid, pid, drive in rows}
+
+    # First non-errored member per album (fallback cover), one DISTINCT ON query.
+    first_member = {
+        aid: (pid, drive)
+        for aid, pid, drive in session.execute(
+            select(PhotoAlbum.album_id, Photo.id, Photo.drive_file_id)
+            .join(Photo, Photo.id == PhotoAlbum.photo_id)
+            .where(PhotoAlbum.album_id.in_(ids), Photo.error.is_(None))
+            .order_by(PhotoAlbum.album_id, Photo.id.asc())
+            .distinct(PhotoAlbum.album_id)
+        ).all()
+    }
+
+    out = []
+    for a in albums:
+        cover = valid_cover.get(a.id) or first_member.get(a.id)
+        out.append(
+            AlbumOut(
+                id=a.id,
+                name=a.name,
+                photo_count=counts.get(a.id, 0),
+                cover_photo_id=cover[0] if cover else None,
+                cover_drive_file_id=cover[1] if cover else None,
+            )
+        )
+    return out
 
 
 @router.get("/photos/{photo_id}/albums", response_model=list[AlbumOut])

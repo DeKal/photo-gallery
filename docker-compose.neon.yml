@@ -1,0 +1,22 @@
+# Neon override: run FE + BE locally against the remote Neon database.
+#
+#   docker compose -f docker-compose.yml -f docker-compose.neon.yml up -d --build api frontend
+#
+# - api points at Neon instead of the local db. We deliberately do NOT set
+#   PHOTO_SERVERLESS: this api is a long-lived container (not a serverless
+#   function), so it uses the normal connection pool and reuses warm Neon
+#   connections — without it every request pays a fresh TLS+pooler handshake
+#   (~seconds). The URL targets the Neon -pooler endpoint, so a pool is safe.
+# - frontend mounts the workerless gateway (media served from the DB by api).
+# The Neon URL is read from the gitignored ./.env (PHOTO_DATABASE_URL_NEON),
+# so the secret never lands in the repo.
+
+services:
+  api:
+    environment:
+      PHOTO_DATABASE_URL: ${PHOTO_DATABASE_URL_NEON:?set PHOTO_DATABASE_URL_NEON in ./.env}
+    depends_on: []
+
+  frontend:
+    volumes:
+      - ./frontend/nginx.neon.conf:/etc/nginx/conf.d/default.conf:ro
