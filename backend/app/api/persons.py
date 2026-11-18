@@ -197,12 +197,12 @@ def list_person_photos(
 def list_person_faces(
     person_id: int,
     album: int | None = Query(default=None),
-    limit: int = Query(default=30, ge=1, le=500),
+    limit: int = Query(default=50, ge=1, le=500),
     session: Session = Depends(get_session),
 ) -> list[FaceOut]:
     """The person's best member faces, highest ``det_score`` first.
 
-    Used by the UI to offer alternative cover faces. Capped at ``limit`` (30 by
+    Used by the UI to offer alternative cover faces. Capped at ``limit`` (50 by
     default) so a person with hundreds of detections shows only the best ones
     rather than an unwieldy wall of faces. When ``album`` is given, only faces
     whose photo is in the album are considered.
