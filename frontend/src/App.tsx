@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
+import { Analytics } from "@vercel/analytics/react";
 import AppShell, { type NavKey, type Counts } from "./components/AppShell";
 import ScanBar from "./components/ScanBar";
 import PeopleGrid from "./components/PeopleGrid";
@@ -76,7 +77,9 @@ export default function App() {
   const showScanHeader = nav === "people" || nav === "similar" || nav === "hidden";
 
   return (
-    <AppShell nav={nav} onNav={onNav} onImportFolder={NO_WORKER ? undefined : importFolder} counts={counts}>
+    <>
+      <Analytics />
+      <AppShell nav={nav} onNav={onNav} onImportFolder={NO_WORKER ? undefined : importFolder} counts={counts}>
       {showScanHeader && (
         <section className="p-space-lg lg:px-margin-lg lg:pt-space-xl border-b border-outline-variant/60 bg-[#111318]/70 backdrop-blur-md">
           {!NO_WORKER && <ScanBar onClustered={reload} path={scanPath} onPathChange={setScanPath} />}
@@ -160,5 +163,6 @@ export default function App() {
         <Route path="*" element={<Navigate to="/all" replace />} />
       </Routes>
     </AppShell>
+    </>
   );
 }
