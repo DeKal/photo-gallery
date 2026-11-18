@@ -1,8 +1,8 @@
-# Keep the Vercel deploy upload small and the Python function slim.
+# Keep the Vercel deploy upload small.
 #
-# The api function needs only backend/app (pulled in via vercel.json
-# includeFiles) -- never the local virtualenv, tests, scripts, SQL, or the ML
-# worker's bits. node_modules/dist are rebuilt by the build command.
+# The `backend` service builds from backend/ (app package + requirements.txt);
+# it never needs the local virtualenv, tests, scripts, or the ML worker's
+# native bits. node_modules/dist are rebuilt by each service's framework.
 **/.venv/
 **/__pycache__/
 **/*.pyc

@@ -1,0 +1,14 @@
+# Slim deps for the Vercel `backend` service (app.vercel_app -> app.main_api).
+# Mirrors pyproject [project].dependencies (base), deliberately WITHOUT the
+# ML/image stack from the `[worker]` optional extra (torch, open_clip,
+# insightface, onnxruntime, pillow, numpy, hdbscan, scikit-learn, gdown) so the
+# serverless build stays under Vercel's size limit. Vercel's Python runtime
+# provides the ASGI server, so uvicorn is omitted here.
+#
+# The native worker is NOT deployed to Vercel; install it locally with
+# `pip install -e .[worker]`.
+fastapi
+sqlalchemy>=2
+psycopg[binary]
+pgvector
+pydantic-settings
