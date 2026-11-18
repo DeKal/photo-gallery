@@ -34,6 +34,9 @@ interface Props {
   onLoadMore?: () => void;
 }
 
+// Retry cycles for the full image after all candidates fail (Drive 429s).
+const MAX_FULL_RETRIES = 4;
+
 // Full-screen overlay showing one image at full resolution with prev/next
 // navigation. Click the backdrop or press Escape to dismiss; ←/→ to page.
 // The same viewer is reused by All Photos, People and Similar — it fetches the
@@ -186,11 +189,22 @@ export default function Lightbox({ ids, index, onIndexChange, onClose, driveIds,
   const driveId = driveIds?.[id] ?? null;
   const fullSrcs = imageSources(id, driveId);
   const [fullI, setFullI] = useState(0);
+  // Retry cycles after every candidate fails — Drive rate-limits (429) full
+  // images under a burst; back off and retry rather than hang on the spinner.
+  const [fullRetry, setFullRetry] = useState(0);
   const [loaded, setLoaded] = useState(false);
+  const fullTimer = useRef<number | null>(null);
   useEffect(() => {
     setLoaded(false);
     setFullI(0);
+    setFullRetry(0);
   }, [id]);
+  useEffect(
+    () => () => {
+      if (fullTimer.current !== null) window.clearTimeout(fullTimer.current);
+    },
+    [],
+  );
   useEffect(() => {
     for (const n of [index - 1, index + 1]) {
       const nid = ids[n];
@@ -344,11 +358,24 @@ export default function Lightbox({ ids, index, onIndexChange, onClose, driveIds,
               covers the gap until it decodes — no separate thumbnail request. */}
           <img
             key={`full-${id}`}
-            src={fullSrcs[Math.min(fullI, fullSrcs.length - 1)]}
+            src={(() => {
+              const b = fullSrcs[Math.min(fullI, fullSrcs.length - 1)];
+              return fullRetry > 0 ? `${b}${b.includes("?") ? "&" : "?"}retry=${fullRetry}` : b;
+            })()}
             alt={`Photo ${id}`}
             referrerPolicy="no-referrer"
             onLoad={() => setLoaded(true)}
-            onError={() => setFullI((i) => i + 1)}
+            onError={() => {
+              if (fullI < fullSrcs.length - 1) {
+                setFullI((i) => i + 1); // try the next candidate (local copy)
+              } else if (fullRetry < MAX_FULL_RETRIES) {
+                const delay = Math.min(8000, 500 * 2 ** fullRetry) + Math.random() * 400;
+                fullTimer.current = window.setTimeout(() => {
+                  setFullRetry((r) => r + 1);
+                  setFullI(0);
+                }, delay);
+              }
+            }}
             className={`h-full w-auto max-w-[94vw] object-contain rounded-xl ring-1 ring-white/10 transition-opacity duration-200 ${
               loaded ? "opacity-100" : "opacity-0"
             }`}
