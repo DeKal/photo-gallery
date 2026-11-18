@@ -134,7 +134,7 @@ export default function ScanBar({ onClustered, path, onPathChange }: Props) {
             type="text"
             data-testid="scan-input"
             className="w-full bg-transparent text-on-surface text-body-sm font-body-sm outline-none border-none p-0 focus:ring-0 placeholder:text-outline"
-            placeholder="/path/to/your/photos"
+            placeholder="/path/to/your/photos or Google Drive folder link"
             value={path}
             onChange={(e) => onPathChange(e.target.value)}
             onKeyDown={(e) => {

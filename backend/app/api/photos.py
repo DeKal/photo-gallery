@@ -106,6 +106,7 @@ def list_photos(
                 width=p.width,
                 height=p.height,
                 taken_at=p.taken_at,
+                drive_file_id=p.drive_file_id,
                 face_count=faces,
                 person_count=len(persons),
                 persons=persons,

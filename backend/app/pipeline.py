@@ -12,10 +12,12 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime, timezone
+from pathlib import Path
 
 from app.analyzer import detect_faces, embed_images
 from app.config import settings
 from app.db import SessionLocal
+from app.drive import download_drive_folder, folder_slug, is_drive_url
 from app.models import Face, ImageEmbedding, Photo, Scan
 from app.scanner import (
     UnreadableImageError,
@@ -46,15 +48,28 @@ def run_scan(scan_id: int) -> None:
             logger.error("run_scan: no Scan row with id=%s", scan_id)
             return
 
-        files = list(iter_images(scan.root_path))
-        scan.total = len(files)
         scan.status = "running"
         scan.started_at = datetime.now(timezone.utc)
         session.commit()
 
+        # A Drive folder is downloaded to a local staging dir first; the rest of
+        # the pipeline then runs over those local files exactly as for a local
+        # folder. ``drive_ids`` maps each absolute local path to its Drive id.
+        drive_ids: dict[str, str] = {}
+        if is_drive_url(scan.root_path):
+            dest = settings.data_dir / "drive" / folder_slug(scan.root_path)
+            drive_ids = download_drive_folder(scan.root_path, dest)
+            scan_root: str | Path = dest
+        else:
+            scan_root = scan.root_path
+
+        files = list(iter_images(scan_root))
+        scan.total = len(files)
+        session.commit()
+
         for index, path in enumerate(files, start=1):
             try:
-                _process_file(session, path)
+                _process_file(session, path, drive_ids)
             except Exception as exc:  # noqa: BLE001 - one bad file must not abort
                 logger.exception("run_scan: failed to process %s", path)
                 _record_error(session, path, exc)
@@ -79,7 +94,7 @@ def run_scan(scan_id: int) -> None:
         session.close()
 
 
-def _process_file(session, path) -> None:
+def _process_file(session, path, drive_ids: dict[str, str] | None = None) -> None:
     """Index a single image file: thumbnail, photo row, CLIP + face embeddings."""
     sha = file_sha256(path)
     existing = session.query(Photo).filter(Photo.sha256 == sha).first()
@@ -90,6 +105,7 @@ def _process_file(session, path) -> None:
     thumb = make_thumbnail(path, settings.thumb_dir, sha256=sha)
     width, height = img.size
 
+    drive_file_id = (drive_ids or {}).get(str(Path(path).resolve()))
     photo = Photo(
         path=str(path),
         sha256=sha,
@@ -97,6 +113,8 @@ def _process_file(session, path) -> None:
         height=height,
         taken_at=file_taken_at(path),
         thumb_path=str(thumb),
+        thumb_data=Path(thumb).read_bytes(),
+        drive_file_id=drive_file_id,
         scanned_at=datetime.now(timezone.utc),
     )
     session.add(photo)
@@ -118,6 +136,7 @@ def _process_file(session, path) -> None:
             img, face["bbox"], settings.thumb_dir, face_row.id
         )
         face_row.thumb_path = str(thumb_path)
+        face_row.thumb_data = Path(thumb_path).read_bytes()
 
 
 def _record_error(session, path, exc: Exception) -> None:

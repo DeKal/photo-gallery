@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { getPhotos, thumbUrl, type PhotoListItem, type PhotoOrder } from "../api";
+import { getPhotos, thumbSources, type PhotoListItem, type PhotoOrder } from "../api";
 import ImgWithFallback from "./ImgWithFallback";
 import Lightbox from "./Lightbox";
 import Icon from "./Icon";
@@ -80,6 +80,12 @@ export default function AllPhotosGrid({
 
   const hasMore = items.length < total;
   const ids = items.map((p) => p.id);
+  // Per-id Drive file id so the lightbox can show the Drive image (fallback: local).
+  const driveIds = useMemo(() => {
+    const m: Record<number, string | null> = {};
+    for (const p of items) m[p.id] = p.drive_file_id ?? null;
+    return m;
+  }, [items]);
 
   return (
     <section className="flex flex-col flex-1">
@@ -150,7 +156,7 @@ export default function AllPhotosGrid({
                 >
                   <ImgWithFallback
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                    sources={[thumbUrl(p.id)]}
+                    sources={thumbSources(p.id, p.drive_file_id)}
                     alt={p.path}
                     placeholder={photoPlaceholder}
                   />
@@ -210,6 +216,7 @@ export default function AllPhotosGrid({
           index={lightbox}
           onIndexChange={setLightbox}
           onClose={() => setLightbox(null)}
+          driveIds={driveIds}
           canLoadMore={hasMore && !loading}
           onLoadMore={() => loadPage(items.length, order, debounced, false)}
           onOpenPerson={

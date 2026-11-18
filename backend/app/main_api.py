@@ -1,17 +1,19 @@
 """API entrypoint: the light, DB-only surface, run in a slim Docker container.
 
-This app serves pure Postgres reads/writes — persons and similarity clusters —
-and pulls none of the ML stack (no torch/open_clip/insightface/sklearn/hdbscan)
-or Pillow. Its routers (``persons``, ``sim``) touch only ``db``/``models``/
-``schemas``, so the container image stays small and portable.
+This app serves pure Postgres reads/writes — persons and similarity clusters,
+plus thumbnails/face crops now stored in-DB — and pulls none of the ML stack
+(no torch/open_clip/insightface/sklearn/hdbscan) or Pillow. Its routers touch
+only ``db``/``models``/``schemas``, so the container image stays small and
+portable (and runs serverless, e.g. on Vercel, with no shared filesystem).
 
-The heavy ML + media surface lives in ``app.main_worker`` (native host); the
-combined all-in-one app for simple local dev is ``app.main``.
+The heavy ML + original-image surface lives in ``app.main_worker`` (native
+host); the combined all-in-one app for simple local dev is ``app.main``.
 """
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.api.media import router as media_router
 from app.api.persons import router as persons_router
 from app.api.photos import router as photos_router
 from app.api.sim import router as sim_router
@@ -35,3 +37,4 @@ def health() -> dict[str, str]:
 app.include_router(persons_router)
 app.include_router(sim_router)
 app.include_router(photos_router)
+app.include_router(media_router)

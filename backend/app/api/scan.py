@@ -10,6 +10,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.db import get_session
+from app.drive import is_drive_url
 from app.models import Scan
 from app.pipeline import run_scan
 from app.schemas import ScanRequest, ScanStatus
@@ -23,11 +24,19 @@ def start_scan(
     background_tasks: BackgroundTasks,
     session: Session = Depends(get_session),
 ) -> dict[str, int]:
-    """Create a scan for ``root_path`` and run the pipeline in the background."""
-    if not os.path.isdir(body.root_path):
-        raise HTTPException(status_code=400, detail="root_path is not a directory")
+    """Create a scan for ``root_path`` and run the pipeline in the background.
 
-    scan = Scan(root_path=body.root_path, status="pending", done=0, total=0)
+    ``root_path`` is either a local directory or a public Google Drive folder
+    URL; Drive folders are downloaded locally first by the pipeline.
+    """
+    root = body.root_path.strip()
+    if not is_drive_url(root) and not os.path.isdir(root):
+        raise HTTPException(
+            status_code=400,
+            detail="root_path is not a directory or a Google Drive folder URL",
+        )
+
+    scan = Scan(root_path=root, status="pending", done=0, total=0)
     session.add(scan)
     session.commit()
     session.refresh(scan)

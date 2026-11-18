@@ -1,0 +1,8 @@
+# Slim deps for the Vercel serverless API (app.main_api). No ML stack — this
+# surface is pure Postgres reads/writes + in-DB thumbnail serving. Vercel's
+# Python runtime provides the ASGI server, so no uvicorn is needed here.
+fastapi
+sqlalchemy>=2
+psycopg[binary]
+pgvector
+pydantic-settings

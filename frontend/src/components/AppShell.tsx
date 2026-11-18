@@ -68,13 +68,15 @@ export default function AppShell({ nav, onNav, onImportFolder, children }: Props
                 <p className="text-body-sm font-body-sm text-outline">Direct drive indexing</p>
               </div>
             </div>
-            <button
-              onClick={onImportFolder}
-              className="flex items-center justify-center gap-space-sm w-full py-2 px-space-md rounded-xl bg-surface-container hover:bg-surface-container-high border border-outline-variant text-on-surface text-label-md font-label-md active:scale-[0.98] transition-colors duration-150"
-            >
-              <Icon name="add_circle" className="text-lg text-primary" />
-              Import Folder
-            </button>
+            {onImportFolder && (
+              <button
+                onClick={onImportFolder}
+                className="flex items-center justify-center gap-space-sm w-full py-2 px-space-md rounded-xl bg-surface-container hover:bg-surface-container-high border border-outline-variant text-on-surface text-label-md font-label-md active:scale-[0.98] transition-colors duration-150"
+              >
+                <Icon name="add_circle" className="text-lg text-primary" />
+                Import Folder
+              </button>
+            )}
 
             {/* Main nav */}
             <div className="flex flex-col gap-1">

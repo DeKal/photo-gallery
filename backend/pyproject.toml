@@ -32,6 +32,7 @@ worker = [
     "onnxruntime",
     "hdbscan",
     "scikit-learn",
+    "gdown",
 ]
 # Test-only deps. The e2e suite exercises the full pipeline, so dev implies worker.
 dev = [

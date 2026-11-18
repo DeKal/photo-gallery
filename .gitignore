@@ -11,5 +11,10 @@ frontend/.playwright/
 *.egg-info/
 graphify-out
 
+# Vercel
+.vercel/
+# DB dump produced for the Neon migration
+*.dump
+
 # local dev screenshot helper
 frontend/shot.mjs

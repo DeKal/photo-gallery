@@ -6,7 +6,7 @@ import {
   setPersonCover,
   renamePerson,
   faceThumbUrl,
-  thumbUrl,
+  thumbSources,
   type Person,
   type Photo,
   type Face,
@@ -322,7 +322,7 @@ export default function PersonDetail({ personId, onBack, onChanged, onOpenPerson
                   >
                     <ImgWithFallback
                       className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-                      sources={[thumbUrl(photo.id)]}
+                      sources={thumbSources(photo.id, photo.drive_file_id)}
                       alt={photo.path}
                       placeholder={photoPlaceholder}
                     />
@@ -349,6 +349,7 @@ export default function PersonDetail({ personId, onBack, onChanged, onOpenPerson
           index={lightbox}
           onIndexChange={setLightbox}
           onClose={() => setLightbox(null)}
+          driveIds={Object.fromEntries(photos.map((p) => [p.id, p.drive_file_id ?? null]))}
           onOpenPerson={
             onOpenPerson
               ? (pid) => {

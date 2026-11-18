@@ -1,7 +1,7 @@
 from datetime import datetime
 
 from pgvector.sqlalchemy import Vector
-from sqlalchemy import ARRAY, Boolean, Float, ForeignKey, String
+from sqlalchemy import ARRAY, Boolean, Float, ForeignKey, LargeBinary, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db import Base
@@ -17,6 +17,12 @@ class Photo(Base):
     height: Mapped[int | None] = mapped_column(nullable=True)
     taken_at: Mapped[datetime | None] = mapped_column(nullable=True)
     thumb_path: Mapped[str | None] = mapped_column(String, nullable=True)
+    # Thumbnail JPEG bytes stored in-DB so media can be served without a shared
+    # filesystem (e.g. serverless/Vercel). thumb_path remains for local dev.
+    thumb_data: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)
+    # Drive file id when this photo came from a Google Drive folder; lets the UI
+    # display the image straight from Drive and fall back to the local file.
+    drive_file_id: Mapped[str | None] = mapped_column(String, nullable=True)
     error: Mapped[str | None] = mapped_column(String, nullable=True)
     scanned_at: Mapped[datetime | None] = mapped_column(nullable=True)
 
@@ -39,6 +45,8 @@ class Face(Base):
     det_score: Mapped[float] = mapped_column(Float)
     vec: Mapped[list[float]] = mapped_column(Vector(512))
     thumb_path: Mapped[str | None] = mapped_column(String, nullable=True)
+    # Cropped-face JPEG bytes stored in-DB (see Photo.thumb_data).
+    thumb_data: Mapped[bytes | None] = mapped_column(LargeBinary, nullable=True)
 
 
 class Person(Base):

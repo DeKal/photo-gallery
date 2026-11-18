@@ -31,6 +31,7 @@ export default function ImgWithFallback({
       src={sources[idx]}
       alt={alt}
       loading="lazy"
+      referrerPolicy="no-referrer"
       onError={() => setIdx((i) => i + 1)}
       {...rest}
     />

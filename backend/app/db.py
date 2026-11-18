@@ -2,24 +2,37 @@ from collections.abc import Iterator
 
 from sqlalchemy import create_engine, event
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
+from sqlalchemy.pool import NullPool
 
 from app.config import settings
 
-engine = create_engine(
-    settings.database_url,
-    pool_pre_ping=True,
-    # Media endpoints (/thumb, /face-thumb, /image) each check out a pooled DB
-    # connection to look up one row. A People/Similar page triggers a burst of
-    # such requests; with the default pool (size 5 + overflow 10 = 15) the
-    # 16th+ concurrent request blocks 30s then fails with QueuePool TimeoutError
-    # (HTTP 500 / broken image). A generous pool for this local, read-heavy,
-    # image-serving workload removes that ceiling. (The media routes also
-    # release their connection before streaming -- see app/api/media.py.)
-    pool_size=20,
-    max_overflow=40,
-    pool_timeout=10,
-    future=True,
-)
+if settings.serverless:
+    # Serverless (e.g. Vercel): each invocation is short-lived and the managed
+    # DB (Neon) does its own connection pooling, so keep none here -- a per-
+    # instance pool would multiply open connections across cold starts and
+    # exhaust Neon's limit. NullPool opens/closes a connection per checkout.
+    engine = create_engine(
+        settings.database_url,
+        poolclass=NullPool,
+        pool_pre_ping=True,
+        future=True,
+    )
+else:
+    engine = create_engine(
+        settings.database_url,
+        pool_pre_ping=True,
+        # Media endpoints (/thumb, /face-thumb, /image) each check out a pooled DB
+        # connection to look up one row. A People/Similar page triggers a burst of
+        # such requests; with the default pool (size 5 + overflow 10 = 15) the
+        # 16th+ concurrent request blocks 30s then fails with QueuePool TimeoutError
+        # (HTTP 500 / broken image). A generous pool for this local, read-heavy,
+        # image-serving workload removes that ceiling. (The media routes also
+        # release their connection before streaming -- see app/api/media.py.)
+        pool_size=20,
+        max_overflow=40,
+        pool_timeout=10,
+        future=True,
+    )
 
 
 @event.listens_for(engine, "connect")

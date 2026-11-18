@@ -38,6 +38,7 @@ export interface Photo {
   id: number;
   path: string;
   thumb_path: string | null;
+  drive_file_id?: string | null;
 }
 
 export interface Face {
@@ -60,6 +61,7 @@ export interface SimilarPhoto {
   photo_id: number;
   distance: number;
   thumb_path: string | null;
+  drive_file_id?: string | null;
 }
 
 export interface FaceMoveResult {
@@ -95,6 +97,42 @@ export function faceThumbUrl(faceId: number): string {
 
 export function imageUrl(photoId: number): string {
   return `${BASE}/image/${photoId}`;
+}
+
+// ---- Google Drive media URLs --------------------------------------------
+// Photos ingested from a Drive folder carry a drive_file_id; we display them
+// straight from Drive (and fall back to the local copy if that fails). These
+// are the two content endpoints that actually render inside an <img>: the
+// normal share link (drive.google.com/file/d/ID/view) is an HTML page and will
+// not embed.
+
+export function driveThumbUrl(fileId: string, size = 1000): string {
+  return `https://drive.google.com/thumbnail?id=${fileId}&sz=w${size}`;
+}
+
+export function driveImageUrl(fileId: string, size = 2000): string {
+  return `https://lh3.googleusercontent.com/d/${fileId}=w${size}`;
+}
+
+// Candidate sources for ImgWithFallback / the lightbox: Drive first (when the
+// photo has a drive_file_id), local copy as the fallback. Order matters — the
+// first that loads wins, so a Drive hiccup degrades to the local image.
+export function thumbSources(
+  photoId: number,
+  driveFileId?: string | null,
+): string[] {
+  return driveFileId
+    ? [driveThumbUrl(driveFileId), thumbUrl(photoId)]
+    : [thumbUrl(photoId)];
+}
+
+export function imageSources(
+  photoId: number,
+  driveFileId?: string | null,
+): string[] {
+  return driveFileId
+    ? [driveImageUrl(driveFileId), imageUrl(photoId)]
+    : [imageUrl(photoId)];
 }
 
 // ---- Scan ----------------------------------------------------------------
@@ -203,6 +241,7 @@ export interface PhotoListItem {
   width: number | null;
   height: number | null;
   taken_at: string | null;
+  drive_file_id?: string | null;
   face_count: number;
   person_count: number;
   persons: PhotoPerson[];

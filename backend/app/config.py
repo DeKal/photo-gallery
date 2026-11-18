@@ -10,6 +10,10 @@ class Settings(BaseSettings):
     database_url: str = "postgresql+psycopg://photo:photo@localhost:5432/photos"
     data_dir: Path = Path.home() / ".photo-app"
     thumb_dir: Optional[Path] = None
+    # Set (PHOTO_SERVERLESS=1) when the API runs on a serverless platform
+    # (e.g. Vercel). Each invocation is short-lived and the DB (Neon) pools
+    # connections itself, so the app must NOT keep its own connection pool.
+    serverless: bool = False
 
     def model_post_init(self, __context) -> None:
         if self.thumb_dir is None:

@@ -8,6 +8,8 @@ CREATE TABLE IF NOT EXISTS photos (
     height INTEGER,
     taken_at TIMESTAMP,
     thumb_path TEXT,
+    thumb_data BYTEA,
+    drive_file_id TEXT,
     error TEXT,
     scanned_at TIMESTAMP
 );
@@ -23,7 +25,8 @@ CREATE TABLE IF NOT EXISTS faces (
     bbox REAL[],
     det_score DOUBLE PRECISION,
     vec vector(512),
-    thumb_path TEXT
+    thumb_path TEXT,
+    thumb_data BYTEA
 );
 
 CREATE TABLE IF NOT EXISTS persons (

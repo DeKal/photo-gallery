@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { imageUrl, thumbUrl, getPhotoPersons, type PhotoPerson } from "../api";
+import { imageSources, getPhotoPersons, type PhotoPerson } from "../api";
 import Icon from "./Icon";
 
 interface Props {
@@ -8,6 +8,9 @@ interface Props {
   index: number;
   onIndexChange: (i: number) => void;
   onClose: () => void;
+  // Per-id Google Drive file id (when the photo came from Drive). The viewer
+  // shows the Drive image and falls back to the local copy if it fails.
+  driveIds?: Record<number, string | null>;
   // Click a person tag to open that person. Omit to hide the tags.
   onOpenPerson?: (id: number) => void;
   // Show a "More like this" action that opens visual-similarity for the photo.
@@ -21,7 +24,7 @@ interface Props {
 // navigation. Click the backdrop or press Escape to dismiss; ←/→ to page.
 // The same viewer is reused by All Photos, People and Similar — it fetches the
 // photo's people itself so every caller gets identical display + actions.
-export default function Lightbox({ ids, index, onIndexChange, onClose, onOpenPerson, onOpenSimilar, canLoadMore, onLoadMore }: Props) {
+export default function Lightbox({ ids, index, onIndexChange, onClose, driveIds, onOpenPerson, onOpenSimilar, canLoadMore, onLoadMore }: Props) {
   const count = ids.length;
   const id = ids[index];
   const hasPrev = index > 0;
@@ -66,19 +69,26 @@ export default function Lightbox({ ids, index, onIndexChange, onClose, onOpenPer
   // Full-res photos are large, so the previous frame lingers while the next
   // one downloads. Show a thumbnail instantly + a spinner until the full image
   // decodes, and preload the neighbours so paging feels instant.
+  // Drive-backed photos are shown from Drive first (index 0) and fall back to
+  // the local copy on error — hence the per-image source index state.
+  const driveId = driveIds?.[id] ?? null;
+  const fullSrcs = imageSources(id, driveId);
+  const [fullI, setFullI] = useState(0);
   const [loaded, setLoaded] = useState(false);
   useEffect(() => {
     setLoaded(false);
+    setFullI(0);
   }, [id]);
   useEffect(() => {
     for (const n of [index - 1, index + 1]) {
       const nid = ids[n];
       if (nid != null) {
         const img = new Image();
-        img.src = imageUrl(nid);
+        img.referrerPolicy = "no-referrer";
+        img.src = imageSources(nid, driveIds?.[nid] ?? null)[0];
       }
     }
-  }, [ids, index]);
+  }, [ids, index, driveIds]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -138,23 +148,16 @@ export default function Lightbox({ ids, index, onIndexChange, onClose, onOpenPer
 
       <div className="relative flex flex-col items-center cursor-default" onClick={(e) => e.stopPropagation()}>
         <div className="relative h-[86vh] flex items-center justify-center">
-          {/* Instant low-res thumbnail underneath (blurred until full loads). */}
-          <img
-            key={`thumb-${id}`}
-            src={thumbUrl(id)}
-            alt=""
-            aria-hidden="true"
-            className={`h-full w-auto max-w-[94vw] object-contain rounded-xl transition-opacity duration-200 ${
-              loaded ? "opacity-0" : "opacity-100 blur-[6px]"
-            }`}
-          />
-          {/* Full-resolution image, fades in once decoded. */}
+          {/* Single image: Drive first (index 0), local copy on error. A spinner
+              covers the gap until it decodes — no separate thumbnail request. */}
           <img
             key={`full-${id}`}
-            src={imageUrl(id)}
+            src={fullSrcs[Math.min(fullI, fullSrcs.length - 1)]}
             alt={`Photo ${id}`}
+            referrerPolicy="no-referrer"
             onLoad={() => setLoaded(true)}
-            className={`absolute inset-0 w-full h-full object-contain rounded-xl ring-1 ring-white/10 transition-opacity duration-200 ${
+            onError={() => setFullI((i) => i + 1)}
+            className={`h-full w-auto max-w-[94vw] object-contain rounded-xl ring-1 ring-white/10 transition-opacity duration-200 ${
               loaded ? "opacity-100" : "opacity-0"
             }`}
             style={{ boxShadow: "0 24px 60px -12px rgba(0,0,0,0.7), 0 0 40px rgba(99,102,241,0.15)" }}

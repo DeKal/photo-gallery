@@ -4,6 +4,7 @@ import {
   getSimClusterPhotos,
   getSimilar,
   thumbUrl,
+  thumbSources,
   type SimCluster,
   type Photo,
   type SimilarPhoto,
@@ -44,13 +45,13 @@ function BackHeader({ onBack, title, hint }: { onBack: () => void; title: string
 }
 
 function PhotoTile({
-  src,
+  sources,
   alt,
   onClick,
   testid,
   distance,
 }: {
-  src: string;
+  sources: string[];
   alt: string;
   onClick: () => void;
   testid?: string;
@@ -65,7 +66,7 @@ function PhotoTile({
       <div className="aspect-square w-full overflow-hidden">
         <ImgWithFallback
           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-          sources={[src]}
+          sources={sources}
           alt={alt}
           placeholder={photoPlaceholder}
         />
@@ -97,7 +98,7 @@ export default function SimilarGrid({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [view, setView] = useState<View>({ kind: "clusters" });
-  const [lightbox, setLightbox] = useState<{ ids: number[]; index: number } | null>(null);
+  const [lightbox, setLightbox] = useState<{ ids: number[]; index: number; driveIds: Record<number, string | null> } | null>(null);
   const [query, setQuery] = useState("");
 
   useEffect(() => {
@@ -125,6 +126,7 @@ export default function SimilarGrid({
       <Lightbox
         ids={lightbox.ids}
         index={lightbox.index}
+        driveIds={lightbox.driveIds}
         onIndexChange={(i) => setLightbox((l) => (l ? { ...l, index: i } : l))}
         onOpenPerson={
           onOpenPerson
@@ -146,7 +148,11 @@ export default function SimilarGrid({
   if (view.kind === "cluster") {
     return (
       <section className={SECTION}>
-        <ClusterPhotos cluster={view.cluster} onBack={() => setView({ kind: "clusters" })} onOpen={(ids, index) => setLightbox({ ids, index })} />
+        <ClusterPhotos
+          cluster={view.cluster}
+          onBack={() => setView({ kind: "clusters" })}
+          onOpen={(ids, index, driveIds) => setLightbox({ ids, index, driveIds })}
+        />
         {lb}
       </section>
     );
@@ -158,7 +164,7 @@ export default function SimilarGrid({
         <SimilarPanel
           photoId={view.photoId}
           onBack={() => (view.from ? setView({ kind: "cluster", cluster: view.from }) : setView({ kind: "clusters" }))}
-          onOpen={(ids, index) => setLightbox({ ids, index })}
+          onOpen={(ids, index, driveIds) => setLightbox({ ids, index, driveIds })}
         />
         {lb}
       </section>
@@ -281,7 +287,7 @@ function ClusterPhotos({
 }: {
   cluster: SimCluster;
   onBack: () => void;
-  onOpen: (ids: number[], index: number) => void;
+  onOpen: (ids: number[], index: number, driveIds: Record<number, string | null>) => void;
 }) {
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [loading, setLoading] = useState(true);
@@ -310,7 +316,19 @@ function ClusterPhotos({
       {loading && <div className="text-outline py-12 text-center">Loading photos…</div>}
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2">
         {photos.map((photo, i) => (
-          <PhotoTile key={photo.id} testid="cluster-photo" src={thumbUrl(photo.id)} alt={photo.path} onClick={() => onOpen(photos.map((p) => p.id), i)} />
+          <PhotoTile
+            key={photo.id}
+            testid="cluster-photo"
+            sources={thumbSources(photo.id, photo.drive_file_id)}
+            alt={photo.path}
+            onClick={() =>
+              onOpen(
+                photos.map((p) => p.id),
+                i,
+                Object.fromEntries(photos.map((p) => [p.id, p.drive_file_id ?? null])),
+              )
+            }
+          />
         ))}
       </div>
     </div>
@@ -324,7 +342,7 @@ function SimilarPanel({
 }: {
   photoId: number;
   onBack: () => void;
-  onOpen: (ids: number[], index: number) => void;
+  onOpen: (ids: number[], index: number, driveIds: Record<number, string | null>) => void;
 }) {
   const [results, setResults] = useState<SimilarPhoto[]>([]);
   const [loading, setLoading] = useState(true);
@@ -355,7 +373,19 @@ function SimilarPanel({
         {!loading && results.length === 0 && <div className="text-outline py-12 text-center">No similar photos found.</div>}
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2">
           {results.map((r, i) => (
-            <PhotoTile key={r.photo_id} src={thumbUrl(r.photo_id)} alt={`Photo ${r.photo_id}`} distance={r.distance} onClick={() => onOpen(results.map((x) => x.photo_id), i)} />
+            <PhotoTile
+              key={r.photo_id}
+              sources={thumbSources(r.photo_id, r.drive_file_id)}
+              alt={`Photo ${r.photo_id}`}
+              distance={r.distance}
+              onClick={() =>
+                onOpen(
+                  results.map((x) => x.photo_id),
+                  i,
+                  Object.fromEntries(results.map((x) => [x.photo_id, x.drive_file_id ?? null])),
+                )
+              }
+            />
           ))}
         </div>
       </div>

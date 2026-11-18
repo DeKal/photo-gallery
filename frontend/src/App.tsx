@@ -7,6 +7,11 @@ import AllPhotosGrid from "./components/AllPhotosGrid";
 import Icon from "./components/Icon";
 import { getPersons, getSimClusters, getPhotos, pickFolder } from "./api";
 
+// Prod deploys (e.g. Vercel) have no ML worker, so scanning and folder import
+// are unavailable. VITE_NO_WORKER=1 hides that UI; browsing + curation (which
+// hit the DB-only API and still write) stay available.
+const NO_WORKER = import.meta.env.VITE_NO_WORKER === "1";
+
 export default function App() {
   const [nav, setNav] = useState<NavKey>("all");
   const [refreshKey, setRefreshKey] = useState(0);
@@ -63,13 +68,13 @@ export default function App() {
   const showScanHeader = nav === "people" || nav === "similar" || nav === "hidden";
 
   return (
-    <AppShell nav={nav} onNav={setNav} onImportFolder={importFolder} counts={counts}>
+    <AppShell nav={nav} onNav={setNav} onImportFolder={NO_WORKER ? undefined : importFolder} counts={counts}>
       {showScanHeader && (
         <section className="p-space-lg lg:px-margin-lg lg:pt-space-xl border-b border-outline-variant/60 bg-[#111318]/70 backdrop-blur-md">
-          <ScanBar onClustered={reload} path={scanPath} onPathChange={setScanPath} />
+          {!NO_WORKER && <ScanBar onClustered={reload} path={scanPath} onPathChange={setScanPath} />}
 
           {/* Segmented mode switch: People vs Similar */}
-          <div className="mt-space-lg flex items-center justify-between border-t border-outline-variant/40 pt-space-md">
+          <div className={`flex items-center justify-between ${NO_WORKER ? "" : "mt-space-lg border-t border-outline-variant/40 pt-space-md"}`}>
             <div className="inline-flex p-1 rounded-2xl bg-[#0c0e13] border border-[#232736]">
               <button
                 onClick={() => setNav("people")}
@@ -120,7 +125,7 @@ export default function App() {
         </section>
       )}
 
-      {nav === "all" && (
+      {nav === "all" && !NO_WORKER && (
         <section className="p-space-lg lg:px-margin-lg lg:pt-space-xl border-b border-outline-variant/60 bg-[#111318]/70 backdrop-blur-md">
           <ScanBar onClustered={reload} path={scanPath} onPathChange={setScanPath} />
         </section>

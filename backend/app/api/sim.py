@@ -117,7 +117,7 @@ def similar_photos(
 
     distance = ImageEmbedding.vec.cosine_distance(query_vec)
     rows = session.execute(
-        select(ImageEmbedding.photo_id, distance, Photo.thumb_path)
+        select(ImageEmbedding.photo_id, distance, Photo.thumb_path, Photo.drive_file_id)
         .join(Photo, Photo.id == ImageEmbedding.photo_id)
         .where(ImageEmbedding.photo_id != photo_id)
         .order_by(distance)
@@ -125,6 +125,11 @@ def similar_photos(
     ).all()
 
     return [
-        SimilarPhoto(photo_id=pid, distance=float(dist), thumb_path=thumb_path)
-        for pid, dist, thumb_path in rows
+        SimilarPhoto(
+            photo_id=pid,
+            distance=float(dist),
+            thumb_path=thumb_path,
+            drive_file_id=drive_file_id,
+        )
+        for pid, dist, thumb_path, drive_file_id in rows
     ]

@@ -47,6 +47,7 @@ class PhotoOut(BaseModel):
     id: int
     path: str
     thumb_path: Optional[str] = None
+    drive_file_id: Optional[str] = None
 
 
 class PhotoPerson(BaseModel):
@@ -67,6 +68,7 @@ class PhotoListItem(BaseModel):
     width: Optional[int] = None
     height: Optional[int] = None
     taken_at: Optional[datetime] = None
+    drive_file_id: Optional[str] = None
     # Cross-check tags: faces detected, and the persons they clustered into.
     face_count: int = 0
     person_count: int = 0
@@ -97,6 +99,7 @@ class SimilarPhoto(BaseModel):
     photo_id: int
     distance: float
     thumb_path: Optional[str] = None
+    drive_file_id: Optional[str] = None
 
 
 class RenameRequest(BaseModel):
