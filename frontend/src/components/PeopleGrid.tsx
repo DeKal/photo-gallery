@@ -368,8 +368,9 @@ export default function PeopleGrid({
                   )}
                 </div>
 
-                {/* Bottom scrim + label */}
-                <div className="absolute inset-x-0 bottom-0 p-4 pt-10 bg-gradient-to-t from-[#0b0d12] via-[#0b0d12]/75 to-transparent flex flex-col justify-end">
+                {/* Label footer — sits below the image so the gradient/text
+                    never covers the face. */}
+                <div className="px-4 py-3 flex flex-col justify-end">
                   {unnamed ? (
                     <>
                       <h3 className="text-headline-sm font-headline-sm font-semibold text-on-surface tracking-tight truncate">Unnamed (Person {p.id})</h3>
