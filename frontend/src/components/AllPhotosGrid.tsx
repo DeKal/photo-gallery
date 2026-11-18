@@ -206,14 +206,14 @@ export default function AllPhotosGrid({
             data-testid="favorites-filter"
             aria-pressed={favorites}
             title={favorites ? "Showing starred only" : "Show starred only"}
-            className={`h-11 px-space-md rounded-xl border text-label-md font-label-md flex items-center gap-space-xs transition-colors ${
+            className={`h-11 w-11 sm:w-auto px-0 sm:px-space-md rounded-xl border text-label-md font-label-md flex items-center justify-center gap-space-xs transition-colors ${
               favorites
                 ? "bg-amber-400/15 border-amber-400/40 text-amber-400 hover:text-amber-300"
                 : "bg-surface-container border-outline-variant/60 text-on-surface hover:bg-surface-container-high"
             }`}
           >
             <Icon name={favorites ? "star" : "star_border"} className="text-[16px]" />
-            <span>Starred</span>
+            <span className="hidden sm:inline">Starred</span>
           </button>
           <div className="relative w-full sm:w-80 order-last sm:order-none">
             <Icon name="search" className="text-[18px] text-outline absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
@@ -232,10 +232,12 @@ export default function AllPhotosGrid({
           </div>
           <button
             onClick={() => setOrder((o) => (o === "newest" ? "oldest" : "newest"))}
-            className="h-11 px-space-md rounded-xl bg-surface-container border border-outline-variant/60 text-on-surface text-label-md font-label-md flex items-center gap-space-xs hover:bg-surface-container-high transition-colors"
+            title={order === "newest" ? "Newest first" : "Oldest first"}
+            aria-label={order === "newest" ? "Sorted newest first" : "Sorted oldest first"}
+            className="h-11 w-11 sm:w-auto px-0 sm:px-space-md rounded-xl bg-surface-container border border-outline-variant/60 text-on-surface text-label-md font-label-md flex items-center justify-center gap-space-xs hover:bg-surface-container-high transition-colors"
           >
-            <Icon name="sort" className="text-[16px] text-outline" />
-            <span>{order === "newest" ? "Newest first" : "Oldest first"}</span>
+            <Icon name={order === "newest" ? "arrow_downward" : "arrow_upward"} className="text-[16px] text-outline" />
+            <span className="hidden sm:inline">{order === "newest" ? "Newest first" : "Oldest first"}</span>
           </button>
         </div>
       </div>
