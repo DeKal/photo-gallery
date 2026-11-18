@@ -10,7 +10,7 @@ export const BASE: string =
 
 // ---- Types ---------------------------------------------------------------
 
-export type ScanStatus = "pending" | "running" | "completed" | "failed";
+export type ScanStatus = "pending" | "running" | "downloading" | "completed" | "failed";
 
 export interface Scan {
   id: number;

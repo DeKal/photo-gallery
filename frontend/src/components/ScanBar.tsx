@@ -210,7 +210,7 @@ export default function ScanBar({ onClustered, path, onPathChange }: Props) {
             className="px-space-xl py-2 rounded-xl bg-gradient-to-r from-indigo-500 via-indigo-600 to-violet-600 hover:opacity-90 text-white font-label-md text-label-md shadow-lg shadow-indigo-500/25 active:scale-[0.98] transition-all flex items-center gap-2 disabled:opacity-45 disabled:cursor-not-allowed"
           >
             <Icon name={busy ? "progress_activity" : "play_arrow"} className={`text-base ${busy ? "animate-spin" : ""}`} />
-            {phase === "scanning" ? "Scanning…" : phase === "clustering" ? "Clustering…" : "Scan"}
+            {phase === "scanning" ? (scan?.status === "downloading" ? "Downloading…" : "Scanning…") : phase === "clustering" ? "Clustering…" : "Scan"}
           </button>
         </div>
       </div>
@@ -234,7 +234,7 @@ export default function ScanBar({ onClustered, path, onPathChange }: Props) {
             </div>
             {scan && (
               <span className="text-body-sm font-body-sm text-on-surface-variant font-medium">
-                {done} / {total} images indexed
+                {done} / {total} {status === "downloading" ? "files downloaded" : "images indexed"}
               </span>
             )}
           </div>

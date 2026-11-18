@@ -17,6 +17,7 @@ from __future__ import annotations
 import logging
 import re
 from pathlib import Path
+from typing import Callable
 
 logger = logging.getLogger(__name__)
 
@@ -41,18 +42,27 @@ def folder_slug(url: str) -> str:
     return re.sub(r"[^A-Za-z0-9_-]+", "_", url.strip())[:80] or "drive"
 
 
-def download_drive_folder(url: str, dest: Path) -> dict[str, str]:
+def download_drive_folder(
+    url: str,
+    dest: Path,
+    on_listed: Callable[[int], None] | None = None,
+) -> dict[str, str]:
     """Download a public Drive folder into ``dest``; return ``{abs_local_path: file_id}``.
 
-    First lists the folder (no download) to learn every file's id and target
-    local path, then downloads each file by id. Downloads resume/skip files
-    already present, so a re-run is cheap. Files that fail to download are
-    logged and omitted from the returned map (the pipeline still indexes
-    whatever landed on disk, just without a Drive id).
+    Lists the folder first (no download) to learn every file's id and target
+    local path, then lets gdown download the whole folder **in one session**.
+    Per-file ``uc?id=`` downloads fail for large files (Google's virus-scan
+    confirmation page), whereas the folder-session download carries the cookies
+    needed to pass it — so we download via the folder, then map each file that
+    landed on disk back to its Drive id using the listing.
+
+    ``on_listed(total)`` is called once the listing is known, so the caller can
+    set up a progress total before the (blocking) download begins.
     """
     import gdown
 
     dest.mkdir(parents=True, exist_ok=True)
+    logger.info("drive: listing folder %s", url)
     listing = gdown.download_folder(
         url=url,
         output=str(dest),
@@ -61,20 +71,38 @@ def download_drive_folder(url: str, dest: Path) -> dict[str, str]:
         use_cookies=False,
     )
     if not listing:
+        logger.warning("drive: listing returned no files for %s", url)
+        if on_listed is not None:
+            on_listed(0)
         return {}
 
+    total = len(listing)
+    logger.info("drive: listed %d file(s); downloading into %s", total, dest)
+    if on_listed is not None:
+        on_listed(total)
+
+    # Folder-session download: handles the large-file confirmation page that
+    # per-file downloads trip over. Resumes/skips files already on disk.
+    gdown.download_folder(
+        url=url,
+        output=str(dest),
+        quiet=True,
+        use_cookies=False,
+        resume=True,
+    )
+
     mapping: dict[str, str] = {}
+    missing = 0
     for entry in listing:
         local_path = Path(entry.local_path)
-        try:
-            gdown.download(
-                id=entry.id,
-                output=str(local_path),
-                quiet=True,
-                resume=True,
-            )
-        except Exception:  # noqa: BLE001 - one bad file must not abort the folder
-            logger.exception("drive: failed to download %s (%s)", entry.path, entry.id)
-            continue
-        mapping[str(local_path.resolve())] = entry.id
+        if local_path.is_file():
+            mapping[str(local_path.resolve())] = entry.id
+        else:
+            missing += 1
+    logger.info(
+        "drive: download complete — %d/%d file(s) on disk (%d missing)",
+        len(mapping),
+        total,
+        missing,
+    )
     return mapping

@@ -17,6 +17,17 @@ from app.api.cluster import router as cluster_router
 from app.api.media import router as media_router
 from app.api.scan import router as scan_router
 
+import logging
+
+# App loggers (pipeline/drive scan progress) propagate to the root logger, which
+# defaults to WARNING — so without this their INFO progress lines are swallowed.
+# Configure INFO once at the entrypoint so scan/download progress is visible in
+# the worker's console.
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s %(levelname)s %(name)s: %(message)s",
+)
+
 app = FastAPI(title="photo-worker")
 
 app.add_middleware(
