@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 import { getPersons, getAlbums, mergePersons, hidePerson, unhidePerson, faceThumbUrl, thumbUrl, type Album, type Person } from "../api";
 import ImgWithFallback from "./ImgWithFallback";
 import PersonDetail from "./PersonDetail";
@@ -18,6 +19,10 @@ interface Props {
   hiddenOnly?: boolean;
   // When set, People are scoped to this album (counts/covers reflect it).
   album?: number;
+  // URL-driven mode (top-level People): the open person comes from /people/:id
+  // and opening/closing navigates, so the person detail is a shareable link.
+  // Omitted when embedded in album detail, where open state stays internal.
+  routed?: boolean;
   // Auto-open this person (focused from another view). Nonce re-triggers.
   focus?: { id: number; n: number } | null;
   // Cross-view handlers passed through to the photo viewer.
@@ -29,14 +34,20 @@ export default function PeopleGrid({
   initialShowHidden = false,
   hiddenOnly = false,
   album,
+  routed = false,
   focus = null,
   onOpenPerson,
   onOpenSimilar,
 }: Props) {
+  const navigate = useNavigate();
+  const params = useParams();
+  const routedPersonId = routed && params.personId ? Number(params.personId) : null;
+
   const [persons, setPersons] = useState<Person[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [openId, setOpenId] = useState<number | null>(null);
+  const [internalOpen, setInternalOpen] = useState<number | null>(null);
+  const openId = routed ? routedPersonId : internalOpen;
   const [showHidden, setShowHidden] = useState(initialShowHidden);
 
   const [selectMode, setSelectMode] = useState(false);
@@ -65,7 +76,13 @@ export default function PeopleGrid({
   function openPerson(id: number) {
     const el = scroller();
     scrollPos.current = el && el.scrollTop > 0 ? el.scrollTop : window.scrollY;
-    setOpenId(id);
+    if (routed) navigate(`/people/${id}`);
+    else setInternalOpen(id);
+  }
+
+  function closePerson() {
+    if (routed) navigate("/people");
+    else setInternalOpen(null);
   }
 
   useLayoutEffect(() => {
@@ -92,10 +109,11 @@ export default function PeopleGrid({
     load();
   }, [load]);
 
-  // Open a person requested from another view (All Photos chip, etc.).
+  // Open a person requested from another view (All Photos chip, etc.). Only in
+  // the internal (album-embedded) mode — routed mode opens via the URL.
   useEffect(() => {
-    if (focus) setOpenId(focus.id);
-  }, [focus]);
+    if (focus && !routed) setInternalOpen(focus.id);
+  }, [focus, routed]);
 
   function toggle(id: number) {
     setSelected((prev) => {
@@ -149,7 +167,7 @@ export default function PeopleGrid({
       <PersonDetail
         personId={openId}
         album={effectiveAlbum}
-        onBack={() => setOpenId(null)}
+        onBack={closePerson}
         onChanged={load}
         onOpenPerson={onOpenPerson}
         onOpenSimilar={onOpenSimilar}

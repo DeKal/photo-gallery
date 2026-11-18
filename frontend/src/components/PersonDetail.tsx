@@ -14,6 +14,7 @@ import {
 } from "../api";
 import ImgWithFallback from "./ImgWithFallback";
 import Lightbox from "./Lightbox";
+import { usePhotoParam } from "../useRouteState";
 import Icon from "./Icon";
 
 interface Props {
@@ -67,7 +68,7 @@ export default function PersonDetail({ personId, album, onBack, onChanged, onOpe
   const [saving, setSaving] = useState(false);
   const [settingCover, setSettingCover] = useState(false);
   const [showAllFaces, setShowAllFaces] = useState(false);
-  const [lightbox, setLightbox] = useState<number | null>(null);
+  const [openPhoto, setOpenPhoto] = usePhotoParam();
   const [exporting, setExporting] = useState(false);
 
   // Download the person's current cover face crop. Falls back to the best
@@ -339,11 +340,11 @@ export default function PersonDetail({ personId, album, onBack, onChanged, onOpe
               )}
 
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-                {photos.map((photo, i) => (
+                {photos.map((photo) => (
                   <div
                     key={photo.id}
                     data-testid="person-photo"
-                    onClick={() => setLightbox(i)}
+                    onClick={() => setOpenPhoto(photo.id)}
                     className="group relative rounded-xl overflow-hidden bg-surface-container border border-outline-variant aspect-square cursor-pointer transition-all duration-200 hover:-translate-y-1 hover:shadow-xl hover:border-primary/40"
                   >
                     <ImgWithFallback
@@ -369,31 +370,36 @@ export default function PersonDetail({ personId, album, onBack, onChanged, onOpe
         )}
       </div>
 
-      {lightbox != null && (
-        <Lightbox
-          ids={photos.map((p) => p.id)}
-          index={lightbox}
-          onIndexChange={setLightbox}
-          onClose={() => setLightbox(null)}
-          driveIds={Object.fromEntries(photos.map((p) => [p.id, p.drive_file_id ?? null]))}
-          onOpenPerson={
-            onOpenPerson
-              ? (pid) => {
-                  setLightbox(null);
-                  onOpenPerson(pid);
-                }
-              : undefined
-          }
-          onOpenSimilar={
-            onOpenSimilar
-              ? (pid) => {
-                  setLightbox(null);
-                  onOpenSimilar(pid);
-                }
-              : undefined
-          }
-        />
-      )}
+      {(() => {
+        const pid = photos.map((p) => p.id);
+        const idx = openPhoto != null ? pid.indexOf(openPhoto) : -1;
+        if (idx < 0) return null;
+        return (
+          <Lightbox
+            ids={pid}
+            index={idx}
+            onIndexChange={(i) => setOpenPhoto(pid[i] ?? null)}
+            onClose={() => setOpenPhoto(null)}
+            driveIds={Object.fromEntries(photos.map((p) => [p.id, p.drive_file_id ?? null]))}
+            onOpenPerson={
+              onOpenPerson
+                ? (p) => {
+                    setOpenPhoto(null);
+                    onOpenPerson(p);
+                  }
+                : undefined
+            }
+            onOpenSimilar={
+              onOpenSimilar
+                ? (p) => {
+                    setOpenPhoto(null);
+                    onOpenSimilar(p);
+                  }
+                : undefined
+            }
+          />
+        );
+      })()}
     </div>
   );
 }

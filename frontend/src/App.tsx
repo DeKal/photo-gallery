@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Navigate, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import AppShell, { type NavKey, type Counts } from "./components/AppShell";
 import ScanBar from "./components/ScanBar";
 import PeopleGrid from "./components/PeopleGrid";
@@ -13,26 +14,29 @@ import { getPersons, getSimClusters, getPhotos, getAlbums, pickFolder } from "./
 // hit the DB-only API and still write) stay available.
 const NO_WORKER = import.meta.env.VITE_NO_WORKER === "1";
 
+// Map the current hash path to a top-nav key for AppShell highlighting.
+function navForPath(pathname: string): NavKey {
+  if (pathname.startsWith("/people")) return "people";
+  if (pathname.startsWith("/hidden")) return "hidden";
+  if (pathname.startsWith("/similar")) return "similar";
+  if (pathname.startsWith("/albums")) return "albums";
+  return "all";
+}
+
 export default function App() {
-  const [nav, setNav] = useState<NavKey>("all");
+  const navigate = useNavigate();
+  const location = useLocation();
+  const nav = navForPath(location.pathname);
+
   const [refreshKey, setRefreshKey] = useState(0);
   const [scanPath, setScanPath] = useState("");
   const [counts, setCounts] = useState<Counts>({ all: null, people: null, similar: null, hidden: null, albums: null });
-  // Person to auto-open in the People view (e.g. clicked from All Photos). The
-  // nonce lets the same person be re-focused after you navigate away and back.
-  const [focus, setFocus] = useState<{ id: number; n: number } | null>(null);
-  // Photo to auto-open "More like this" for in the Similar view.
-  const [simFocus, setSimFocus] = useState<{ photoId: number; n: number } | null>(null);
 
-  const openPerson = (id: number) => {
-    setFocus((f) => ({ id, n: (f?.n ?? 0) + 1 }));
-    setNav("people");
-  };
-
-  const openSimilar = (photoId: number) => {
-    setSimFocus((f) => ({ photoId, n: (f?.n ?? 0) + 1 }));
-    setNav("similar");
-  };
+  // Cross-view navigation now goes through the URL so any landing spot is a
+  // shareable link: open a person, or jump to a photo's "More like this".
+  const openPerson = (id: number) => navigate(`/people/${id}`);
+  const openSimilar = (photoId: number) => navigate(`/similar/photo/${photoId}`);
+  const onNav = (key: NavKey) => navigate(key === "all" ? "/all" : `/${key}`);
 
   useEffect(() => {
     getPersons(false)
@@ -59,7 +63,7 @@ export default function App() {
       const { path } = await pickFolder();
       if (path) {
         setScanPath(path);
-        if (nav !== "people" && nav !== "similar" && nav !== "hidden") setNav("people");
+        if (nav !== "people" && nav !== "similar" && nav !== "hidden") navigate("/people");
       }
     } catch {
       // Picker cancelled or unavailable — ignore.
@@ -72,7 +76,7 @@ export default function App() {
   const showScanHeader = nav === "people" || nav === "similar" || nav === "hidden";
 
   return (
-    <AppShell nav={nav} onNav={setNav} onImportFolder={NO_WORKER ? undefined : importFolder} counts={counts}>
+    <AppShell nav={nav} onNav={onNav} onImportFolder={NO_WORKER ? undefined : importFolder} counts={counts}>
       {showScanHeader && (
         <section className="p-space-lg lg:px-margin-lg lg:pt-space-xl border-b border-outline-variant/60 bg-[#111318]/70 backdrop-blur-md">
           {!NO_WORKER && <ScanBar onClustered={reload} path={scanPath} onPathChange={setScanPath} />}
@@ -81,7 +85,7 @@ export default function App() {
           <div className={`flex items-center justify-between ${NO_WORKER ? "" : "mt-space-lg border-t border-outline-variant/40 pt-space-md"}`}>
             <div className="inline-flex p-1 rounded-2xl bg-[#0c0e13] border border-[#232736]">
               <button
-                onClick={() => setNav("people")}
+                onClick={() => navigate("/people")}
                 className={`flex items-center gap-2 px-space-lg py-1.5 rounded-xl font-label-md text-label-md transition-colors ${
                   peopleActive
                     ? "bg-gradient-to-r from-indigo-500 to-violet-600 text-white shadow-md shadow-indigo-500/30"
@@ -101,7 +105,7 @@ export default function App() {
                 )}
               </button>
               <button
-                onClick={() => setNav("similar")}
+                onClick={() => navigate("/similar")}
                 className={`flex items-center gap-2 px-space-lg py-1.5 rounded-xl font-label-md text-label-md transition-colors ${
                   nav === "similar"
                     ? "bg-gradient-to-r from-indigo-500 to-violet-600 text-white shadow-md shadow-indigo-500/30"
@@ -135,19 +139,46 @@ export default function App() {
         </section>
       )}
 
-      {(nav === "people" || nav === "hidden") && (
-        <PeopleGrid
-          key={`people-${nav}-${refreshKey}`}
-          initialShowHidden={nav === "hidden"}
-          hiddenOnly={nav === "hidden"}
-          focus={nav === "people" ? focus : null}
-          onOpenPerson={openPerson}
-          onOpenSimilar={openSimilar}
+      <Routes>
+        <Route path="/" element={<Navigate to="/all" replace />} />
+        <Route
+          path="/all"
+          element={<AllPhotosGrid key={`all-${refreshKey}`} onOpenPerson={openPerson} onOpenSimilar={openSimilar} />}
         />
-      )}
-      {nav === "similar" && <SimilarGrid key={`similar-${refreshKey}`} focus={simFocus} onOpenPerson={openPerson} onOpenSimilar={openSimilar} />}
-      {nav === "all" && <AllPhotosGrid key={`all-${refreshKey}`} onOpenPerson={openPerson} onOpenSimilar={openSimilar} />}
-      {nav === "albums" && <AlbumsGrid key={`albums-${refreshKey}`} onOpenPerson={openPerson} onOpenSimilar={openSimilar} />}
+        <Route
+          path="/people"
+          element={<PeopleGrid key={`people-${refreshKey}`} routed onOpenPerson={openPerson} onOpenSimilar={openSimilar} />}
+        />
+        <Route
+          path="/people/:personId"
+          element={<PeopleGrid key={`people-${refreshKey}`} routed onOpenPerson={openPerson} onOpenSimilar={openSimilar} />}
+        />
+        <Route
+          path="/hidden"
+          element={<PeopleGrid key={`hidden-${refreshKey}`} routed hiddenOnly initialShowHidden onOpenPerson={openPerson} onOpenSimilar={openSimilar} />}
+        />
+        <Route
+          path="/similar"
+          element={<SimilarGrid key={`similar-${refreshKey}`} routed onOpenPerson={openPerson} onOpenSimilar={openSimilar} />}
+        />
+        <Route
+          path="/similar/cluster/:clusterId"
+          element={<SimilarGrid key={`similar-${refreshKey}`} routed onOpenPerson={openPerson} onOpenSimilar={openSimilar} />}
+        />
+        <Route
+          path="/similar/photo/:photoId"
+          element={<SimilarGrid key={`similar-${refreshKey}`} routed onOpenPerson={openPerson} onOpenSimilar={openSimilar} />}
+        />
+        <Route
+          path="/albums"
+          element={<AlbumsGrid key={`albums-${refreshKey}`} onOpenPerson={openPerson} onOpenSimilar={openSimilar} />}
+        />
+        <Route
+          path="/albums/:albumId"
+          element={<AlbumsGrid key={`albums-${refreshKey}`} onOpenPerson={openPerson} onOpenSimilar={openSimilar} />}
+        />
+        <Route path="*" element={<Navigate to="/all" replace />} />
+      </Routes>
     </AppShell>
   );
 }

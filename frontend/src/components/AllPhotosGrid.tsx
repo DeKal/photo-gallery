@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getPhotos, getAlbums, removePhotosFromAlbum, setAlbumCover, thumbSources, type Album, type PhotoListItem, type PhotoOrder } from "../api";
+import { usePhotoParam } from "../useRouteState";
 import ImgWithFallback from "./ImgWithFallback";
 import Lightbox from "./Lightbox";
 import Icon from "./Icon";
@@ -55,7 +56,8 @@ export default function AllPhotosGrid({
   const [debounced, setDebounced] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [lightbox, setLightbox] = useState<number | null>(null);
+  // The open photo lives in the `?photo=<id>` query so it's part of the URL.
+  const [openPhoto, setOpenPhoto] = usePhotoParam();
   // In the global library view, let the user narrow to a single album. When the
   // grid is already pinned to an album (album-detail), this picker is hidden and
   // the pinned album wins.
@@ -268,7 +270,7 @@ export default function AllPhotosGrid({
               {g.photos.map((p) => (
                 <div
                   key={p.id}
-                  onClick={() => setLightbox(ids.indexOf(p.id))}
+                  onClick={() => setOpenPhoto(p.id)}
                   className="relative group aspect-square rounded-2xl overflow-hidden bg-surface-container border border-outline-variant/40 hover:border-outline cursor-pointer transition-all duration-200"
                 >
                   <ImgWithFallback
@@ -355,33 +357,42 @@ export default function AllPhotosGrid({
         {loading && items.length === 0 && <div className="text-outline py-12 text-center">Loading photos…</div>}
       </div>
 
-      {lightbox != null && (
-        <Lightbox
-          ids={ids}
-          index={lightbox}
-          onIndexChange={setLightbox}
-          onClose={() => setLightbox(null)}
-          driveIds={driveIds}
-          canLoadMore={hasMore && !loading}
-          onLoadMore={() => loadPage(items.length, order, debounced, false)}
-          onOpenPerson={
-            onOpenPerson
-              ? (pid) => {
-                  setLightbox(null);
-                  onOpenPerson(pid);
-                }
-              : undefined
-          }
-          onOpenSimilar={
-            onOpenSimilar
-              ? (pid) => {
-                  setLightbox(null);
-                  onOpenSimilar(pid);
-                }
-              : undefined
-          }
-        />
-      )}
+      {openPhoto != null && (() => {
+        // Map the ?photo id to a position in the loaded list. If it isn't loaded
+        // (e.g. a deep link to a photo past the first page), open it standalone
+        // so the link still works — just without prev/next across the library.
+        const pos = ids.indexOf(openPhoto);
+        const inList = pos >= 0;
+        const lbIds = inList ? ids : [openPhoto];
+        const lbIndex = inList ? pos : 0;
+        return (
+          <Lightbox
+            ids={lbIds}
+            index={lbIndex}
+            onIndexChange={(i) => setOpenPhoto(lbIds[i] ?? null)}
+            onClose={() => setOpenPhoto(null)}
+            driveIds={driveIds}
+            canLoadMore={inList && hasMore && !loading}
+            onLoadMore={() => loadPage(items.length, order, debounced, false)}
+            onOpenPerson={
+              onOpenPerson
+                ? (pid) => {
+                    setOpenPhoto(null);
+                    onOpenPerson(pid);
+                  }
+                : undefined
+            }
+            onOpenSimilar={
+              onOpenSimilar
+                ? (pid) => {
+                    setOpenPhoto(null);
+                    onOpenSimilar(pid);
+                  }
+                : undefined
+            }
+          />
+        );
+      })()}
     </section>
   );
 }

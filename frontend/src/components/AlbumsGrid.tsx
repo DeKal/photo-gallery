@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 import {
   getAlbums,
   createAlbum,
@@ -32,7 +33,11 @@ export default function AlbumsGrid({
   const [albums, setAlbums] = useState<Album[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [selected, setSelected] = useState<Album | null>(null);
+  // Selected album comes from /albums/:albumId so the detail view is linkable.
+  const navigate = useNavigate();
+  const params = useParams();
+  const openAlbumId = params.albumId ? Number(params.albumId) : null;
+  const selected = openAlbumId != null ? albums.find((a) => a.id === openAlbumId) ?? null : null;
   // Modal for naming an album; replaces window.prompt for create + rename.
   const [dialog, setDialog] = useState<{ mode: "create" } | { mode: "rename"; album: Album } | null>(null);
 
@@ -80,7 +85,7 @@ export default function AlbumsGrid({
         key={`album-${selected.id}`}
         album={{ id: selected.id, name: selected.name, coverPhotoId: selected.cover_photo_id }}
         onBack={() => {
-          setSelected(null);
+          navigate("/albums");
           load();
         }}
         onAlbumChanged={load}
@@ -125,7 +130,7 @@ export default function AlbumsGrid({
           {albums.map((a) => (
             <div
               key={a.id}
-              onClick={() => setSelected(a)}
+              onClick={() => navigate(`/albums/${a.id}`)}
               className="group relative rounded-2xl bg-surface-container overflow-hidden shadow-lg cursor-pointer transition-all duration-300 hover:scale-[1.015] hover:shadow-primary/10 border border-outline-variant hover:border-primary/40"
             >
               <div className="relative aspect-square w-full overflow-hidden bg-surface-container-lowest">

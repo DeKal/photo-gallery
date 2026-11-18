@@ -1,5 +1,6 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
+import { HashRouter } from "react-router-dom";
 import App from "./App";
 import "./index.css";
 
@@ -15,9 +16,15 @@ if (document.fonts && "ready" in document.fonts) {
 }
 setTimeout(revealFonts, 3000);
 
+// HashRouter (not BrowserRouter): the backend API owns root paths (/photos,
+// /albums, /persons, …) behind the same nginx origin, so client routes live
+// after the `#` to avoid colliding with them — and deep links survive a reload
+// with no server rewrite rules.
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <App />
+    <HashRouter>
+      <App />
+    </HashRouter>
   </StrictMode>,
 );
 

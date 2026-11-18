@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
 import {
   getSimClusters,
   getSimClusterPhotos,
@@ -11,6 +12,7 @@ import {
   type Photo,
   type SimilarPhoto,
 } from "../api";
+import { usePhotoParam } from "../useRouteState";
 import ImgWithFallback from "./ImgWithFallback";
 import Lightbox from "./Lightbox";
 import Icon from "./Icon";
@@ -88,28 +90,58 @@ type View =
   | { kind: "similar"; photoId: number; from: SimCluster | null };
 
 export default function SimilarGrid({
+  routed = false,
   focus = null,
   album,
   onOpenPerson,
   onOpenSimilar,
 }: {
+  // URL-driven mode (top-level Similar): clusters / cluster / similar come from
+  // /similar, /similar/cluster/:id, /similar/photo/:id so each is linkable. When
+  // embedded in album detail (routed omitted), the drill-down stays internal.
+  routed?: boolean;
   focus?: { photoId: number; n: number } | null;
   // When set, clusters/similarity are scoped to this album.
   album?: number;
   onOpenPerson?: (id: number) => void;
   onOpenSimilar?: (id: number) => void;
 }) {
+  const navigate = useNavigate();
+  const params = useParams();
   const [clusters, setClusters] = useState<SimCluster[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [view, setView] = useState<View>({ kind: "clusters" });
-  const [lightbox, setLightbox] = useState<{ ids: number[]; index: number; driveIds: Record<number, string | null> } | null>(null);
+  const [internalView, setInternalView] = useState<View>({ kind: "clusters" });
+  // Open photo mirrored to ?photo so the lightbox is part of the URL.
+  const [openPhoto, setOpenPhoto] = usePhotoParam();
+  // The id list + drive ids of whatever panel is on screen, lifted up so the
+  // ?photo id can be mapped to a position in the lightbox.
+  const [panel, setPanel] = useState<{ ids: number[]; driveIds: Record<number, string | null> }>({ ids: [], driveIds: {} });
   const [query, setQuery] = useState("");
   // Top-level Similar can be narrowed to one album; when embedded in album-detail
   // the `album` prop pins it and this picker is hidden.
   const [albums, setAlbums] = useState<Album[]>([]);
   const [albumFilter, setAlbumFilter] = useState<number | null>(null);
   const effectiveAlbum = album ?? albumFilter ?? undefined;
+
+  // Resolve the active view from the URL (routed) or internal state (embedded).
+  let view: View;
+  if (routed) {
+    const clusterId = params.clusterId ? Number(params.clusterId) : null;
+    const photoId = params.photoId ? Number(params.photoId) : null;
+    if (photoId != null) view = { kind: "similar", photoId, from: null };
+    else if (clusterId != null) {
+      const found = clusters.find((c) => c.id === clusterId);
+      view = { kind: "cluster", cluster: found ?? { id: clusterId, label: null, cover_photo_id: null, photo_count: 0, person_names: [] } };
+    } else view = { kind: "clusters" };
+  } else {
+    view = internalView;
+  }
+
+  const goClusters = () => (routed ? navigate("/similar") : (setOpenPhoto(null), setInternalView({ kind: "clusters" })));
+  const goCluster = (c: SimCluster) => (routed ? navigate(`/similar/cluster/${c.id}`) : (setOpenPhoto(null), setInternalView({ kind: "cluster", cluster: c })));
+  const goSimilar = (photoId: number, from: SimCluster | null) =>
+    routed ? navigate(`/similar/photo/${photoId}`) : (setOpenPhoto(null), setInternalView({ kind: "similar", photoId, from }));
 
   useEffect(() => {
     if (album != null) return;
@@ -129,38 +161,51 @@ export default function SimilarGrid({
       .finally(() => setLoading(false));
   }, [effectiveAlbum]);
 
-  // "More like this" requested from another view → jump straight to the
-  // visual-similarity results for that photo.
+  // "More like this" requested from another view in embedded mode → jump to the
+  // visual-similarity results for that photo (routed mode navigates via URL).
   useEffect(() => {
-    if (focus) {
-      setLightbox(null);
-      setView({ kind: "similar", photoId: focus.photoId, from: null });
+    if (focus && !routed) {
+      setOpenPhoto(null);
+      setInternalView({ kind: "similar", photoId: focus.photoId, from: null });
     }
-  }, [focus]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focus, routed]);
 
-  const lb =
-    lightbox != null ? (
+  // Reset the lifted panel list whenever the on-screen panel changes.
+  const viewKey = view.kind === "clusters" ? "clusters" : view.kind === "cluster" ? `c${view.cluster.id}` : `s${view.photoId}`;
+  useEffect(() => {
+    setPanel({ ids: [], driveIds: {} });
+  }, [viewKey]);
+
+  const lbIdx = openPhoto != null ? panel.ids.indexOf(openPhoto) : -1;
+  const showLb = openPhoto != null && (view.kind === "cluster" || view.kind === "similar");
+  const lb = showLb ? (() => {
+    const inList = lbIdx >= 0;
+    const lbIds = inList ? panel.ids : [openPhoto as number];
+    const lbPos = inList ? lbIdx : 0;
+    return (
       <Lightbox
-        ids={lightbox.ids}
-        index={lightbox.index}
-        driveIds={lightbox.driveIds}
-        onIndexChange={(i) => setLightbox((l) => (l ? { ...l, index: i } : l))}
+        ids={lbIds}
+        index={lbPos}
+        driveIds={panel.driveIds}
+        onIndexChange={(i) => setOpenPhoto(lbIds[i] ?? null)}
         onOpenPerson={
           onOpenPerson
             ? (pid) => {
-                setLightbox(null);
+                setOpenPhoto(null);
                 onOpenPerson(pid);
               }
             : undefined
         }
         onOpenSimilar={(pid) => {
-          setLightbox(null);
+          setOpenPhoto(null);
           if (onOpenSimilar) onOpenSimilar(pid);
-          else setView({ kind: "similar", photoId: pid, from: view.kind === "cluster" ? view.cluster : null });
+          else goSimilar(pid, view.kind === "cluster" ? view.cluster : null);
         }}
-        onClose={() => setLightbox(null)}
+        onClose={() => setOpenPhoto(null)}
       />
-    ) : null;
+    );
+  })() : null;
 
   if (view.kind === "cluster") {
     return (
@@ -168,8 +213,9 @@ export default function SimilarGrid({
         <ClusterPhotos
           cluster={view.cluster}
           album={effectiveAlbum}
-          onBack={() => setView({ kind: "clusters" })}
-          onOpen={(ids, index, driveIds) => setLightbox({ ids, index, driveIds })}
+          onBack={goClusters}
+          onReady={(ids, driveIds) => setPanel({ ids, driveIds })}
+          onPick={(id) => setOpenPhoto(id)}
         />
         {lb}
       </section>
@@ -182,8 +228,9 @@ export default function SimilarGrid({
         <SimilarPanel
           photoId={view.photoId}
           album={effectiveAlbum}
-          onBack={() => (view.from ? setView({ kind: "cluster", cluster: view.from }) : setView({ kind: "clusters" }))}
-          onOpen={(ids, index, driveIds) => setLightbox({ ids, index, driveIds })}
+          onBack={() => (view.kind === "similar" && view.from ? goCluster(view.from) : goClusters())}
+          onReady={(ids, driveIds) => setPanel({ ids, driveIds })}
+          onPick={(id) => setOpenPhoto(id)}
         />
         {lb}
       </section>
@@ -264,7 +311,7 @@ export default function SimilarGrid({
             <div
               key={c.id}
               data-testid="sim-cluster-card"
-              onClick={() => setView({ kind: "cluster", cluster: c })}
+              onClick={() => goCluster(c)}
               className={`group relative rounded-2xl bg-surface-container overflow-hidden shadow-lg cursor-pointer transition-all duration-300 hover:scale-[1.015] hover:shadow-primary/10 border ${
                 unlabeled ? "border-dashed border-outline hover:border-primary" : "border-outline-variant hover:border-primary/40"
               }`}
@@ -322,12 +369,14 @@ function ClusterPhotos({
   cluster,
   album,
   onBack,
-  onOpen,
+  onReady,
+  onPick,
 }: {
   cluster: SimCluster;
   album?: number;
   onBack: () => void;
-  onOpen: (ids: number[], index: number, driveIds: Record<number, string | null>) => void;
+  onReady: (ids: number[], driveIds: Record<number, string | null>) => void;
+  onPick: (id: number) => void;
 }) {
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [loading, setLoading] = useState(true);
@@ -338,10 +387,15 @@ function ClusterPhotos({
     getSimClusterPhotos(cluster.id, album)
       .then((p) => {
         setPhotos(p);
+        onReady(
+          p.map((x) => x.id),
+          Object.fromEntries(p.map((x) => [x.id, x.drive_file_id ?? null])),
+        );
         setError(null);
       })
       .catch((e) => setError(e instanceof Error ? e.message : String(e)))
       .finally(() => setLoading(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cluster.id, album]);
 
   return (
@@ -355,19 +409,13 @@ function ClusterPhotos({
       )}
       {loading && <div className="text-outline py-12 text-center">Loading photos…</div>}
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2">
-        {photos.map((photo, i) => (
+        {photos.map((photo) => (
           <PhotoTile
             key={photo.id}
             testid="cluster-photo"
             sources={thumbSources(photo.id, photo.drive_file_id)}
             alt={photo.path}
-            onClick={() =>
-              onOpen(
-                photos.map((p) => p.id),
-                i,
-                Object.fromEntries(photos.map((p) => [p.id, p.drive_file_id ?? null])),
-              )
-            }
+            onClick={() => onPick(photo.id)}
           />
         ))}
       </div>
@@ -379,12 +427,14 @@ function SimilarPanel({
   photoId,
   album,
   onBack,
-  onOpen,
+  onReady,
+  onPick,
 }: {
   photoId: number;
   album?: number;
   onBack: () => void;
-  onOpen: (ids: number[], index: number, driveIds: Record<number, string | null>) => void;
+  onReady: (ids: number[], driveIds: Record<number, string | null>) => void;
+  onPick: (id: number) => void;
 }) {
   const [results, setResults] = useState<SimilarPhoto[]>([]);
   const [loading, setLoading] = useState(true);
@@ -394,11 +444,17 @@ function SimilarPanel({
     setLoading(true);
     getSimilar(photoId, 50, album)
       .then((r) => {
-        setResults([...r].sort((a, b) => a.distance - b.distance));
+        const sorted = [...r].sort((a, b) => a.distance - b.distance);
+        setResults(sorted);
+        onReady(
+          sorted.map((x) => x.photo_id),
+          Object.fromEntries(sorted.map((x) => [x.photo_id, x.drive_file_id ?? null])),
+        );
         setError(null);
       })
       .catch((e) => setError(e instanceof Error ? e.message : String(e)))
       .finally(() => setLoading(false));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [photoId, album]);
 
   return (
@@ -414,19 +470,13 @@ function SimilarPanel({
         {loading && <div className="text-outline py-12 text-center">Finding similar photos…</div>}
         {!loading && results.length === 0 && <div className="text-outline py-12 text-center">No similar photos found.</div>}
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2">
-          {results.map((r, i) => (
+          {results.map((r) => (
             <PhotoTile
               key={r.photo_id}
               sources={thumbSources(r.photo_id, r.drive_file_id)}
               alt={`Photo ${r.photo_id}`}
               distance={r.distance}
-              onClick={() =>
-                onOpen(
-                  results.map((x) => x.photo_id),
-                  i,
-                  Object.fromEntries(results.map((x) => [x.photo_id, x.drive_file_id ?? null])),
-                )
-              }
+              onClick={() => onPick(r.photo_id)}
             />
           ))}
         </div>

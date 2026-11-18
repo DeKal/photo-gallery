@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useSearchParams } from "react-router-dom";
 import AllPhotosGrid from "./AllPhotosGrid";
 import PeopleGrid from "./PeopleGrid";
 import SimilarGrid from "./SimilarGrid";
@@ -32,7 +32,22 @@ export default function AlbumView({
   // Fired when the album's cover changes, so the parent card can refresh.
   onAlbumChanged?: () => void;
 }) {
-  const [tab, setTab] = useState<Tab>("photos");
+  // The active tab lives in `?tab=` so an album's People/Similar view is linkable.
+  // Switching tabs clears any open ?photo (it belonged to the previous tab's list).
+  const [sp, setSp] = useSearchParams();
+  const raw = sp.get("tab");
+  const tab: Tab = raw === "people" || raw === "similar" ? raw : "photos";
+  const setTab = (t: Tab) =>
+    setSp(
+      (prev) => {
+        const n = new URLSearchParams(prev);
+        n.delete("photo");
+        if (t === "photos") n.delete("tab");
+        else n.set("tab", t);
+        return n;
+      },
+      { replace: true },
+    );
 
   return (
     <section className="flex flex-col flex-1">
