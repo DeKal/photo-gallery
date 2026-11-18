@@ -23,11 +23,14 @@ export default function AlbumView({
   onBack,
   onOpenPerson,
   onOpenSimilar,
+  onAlbumChanged,
 }: {
-  album: { id: number; name: string };
+  album: { id: number; name: string; coverPhotoId?: number | null };
   onBack: () => void;
   onOpenPerson?: (id: number) => void;
   onOpenSimilar?: (id: number) => void;
+  // Fired when the album's cover changes, so the parent card can refresh.
+  onAlbumChanged?: () => void;
 }) {
   const [tab, setTab] = useState<Tab>("photos");
 
@@ -65,6 +68,7 @@ export default function AlbumView({
           key={`album-photos-${album.id}`}
           album={album}
           embedded
+          onAlbumChanged={onAlbumChanged}
           onOpenPerson={onOpenPerson}
           onOpenSimilar={onOpenSimilar}
         />

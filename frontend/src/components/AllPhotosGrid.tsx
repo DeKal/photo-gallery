@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { getPhotos, getAlbums, removePhotosFromAlbum, thumbSources, type Album, type PhotoListItem, type PhotoOrder } from "../api";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { getPhotos, getAlbums, removePhotosFromAlbum, setAlbumCover, thumbSources, type Album, type PhotoListItem, type PhotoOrder } from "../api";
 import ImgWithFallback from "./ImgWithFallback";
 import Lightbox from "./Lightbox";
 import Icon from "./Icon";
@@ -33,14 +33,17 @@ export default function AllPhotosGrid({
   onOpenSimilar,
   album,
   onBack,
+  onAlbumChanged,
   embedded = false,
 }: {
   onOpenPerson?: (id: number) => void;
   onOpenSimilar?: (id: number) => void;
   // When set, the grid shows only this album's photos, with a back button and a
-  // per-photo remove-from-album action.
-  album?: { id: number; name: string };
+  // per-photo remove-from-album action. `coverPhotoId` marks the current cover.
+  album?: { id: number; name: string; coverPhotoId?: number | null };
   onBack?: () => void;
+  // Fired after the album's cover changes, so the parent can refresh its card.
+  onAlbumChanged?: () => void;
   // When embedded in the album-detail tabs, the owning view already renders the
   // Back button + album title, so the grid drops its own (keeps count + search).
   embedded?: boolean;
@@ -58,11 +61,13 @@ export default function AllPhotosGrid({
   // the pinned album wins.
   const [albums, setAlbums] = useState<Album[]>([]);
   const [albumFilter, setAlbumFilter] = useState<number | null>(null);
+  // Narrow the grid to starred photos only.
+  const [favorites, setFavorites] = useState(false);
 
   const albumId = album?.id ?? albumFilter ?? undefined;
   const loadPage = useCallback((offset: number, ord: PhotoOrder, q: string, replace: boolean) => {
     setLoading(true);
-    getPhotos(PAGE, offset, ord, q, albumId)
+    getPhotos(PAGE, offset, ord, q, albumId, favorites)
       .then((page) => {
         setTotal(page.total);
         setItems((prev) => (replace ? page.items : [...prev, ...page.items]));
@@ -70,7 +75,7 @@ export default function AllPhotosGrid({
       })
       .catch((e) => setError(e instanceof Error ? e.message : String(e)))
       .finally(() => setLoading(false));
-  }, [albumId]);
+  }, [albumId, favorites]);
 
   // Album options for the library-view filter (not needed when album-pinned).
   useEffect(() => {
@@ -86,6 +91,20 @@ export default function AllPhotosGrid({
       await removePhotosFromAlbum(albumId, [photoId]);
       setItems((prev) => prev.filter((p) => p.id !== photoId));
       setTotal((t) => Math.max(0, t - 1));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    }
+  };
+
+  // Which member photo is the album cover (highlighted star). Seeded from the
+  // album prop, updated optimistically when the user picks a new one.
+  const [coverId, setCoverId] = useState<number | null | undefined>(album?.coverPhotoId);
+  const setCover = async (photoId: number) => {
+    if (!album) return;
+    try {
+      await setAlbumCover(album.id, photoId);
+      setCoverId(photoId);
+      onAlbumChanged?.();
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     }
@@ -115,6 +134,24 @@ export default function AllPhotosGrid({
 
   const hasMore = items.length < total;
   const ids = items.map((p) => p.id);
+
+  // Infinite scroll: when a sentinel below the grid scrolls into view, fetch the
+  // next page. The manual "Load more" button stays as a fallback.
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el || !hasMore || loading) return;
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) {
+          loadPage(items.length, order, debounced, false);
+        }
+      },
+      { rootMargin: "600px" },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [hasMore, loading, items.length, order, debounced, loadPage]);
   // Per-id Drive file id so the lightbox can show the Drive image (fallback: local).
   const driveIds = useMemo(() => {
     const m: Record<number, string | null> = {};
@@ -162,6 +199,20 @@ export default function AllPhotosGrid({
               <Icon name="expand_more" className="text-[16px] text-outline absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
             </div>
           )}
+          <button
+            onClick={() => setFavorites((f) => !f)}
+            data-testid="favorites-filter"
+            aria-pressed={favorites}
+            title={favorites ? "Showing starred only" : "Show starred only"}
+            className={`h-11 px-space-md rounded-xl border text-label-md font-label-md flex items-center gap-space-xs transition-colors ${
+              favorites
+                ? "bg-amber-400/15 border-amber-400/40 text-amber-400 hover:text-amber-300"
+                : "bg-surface-container border-outline-variant/60 text-on-surface hover:bg-surface-container-high"
+            }`}
+          >
+            <Icon name={favorites ? "star" : "star_border"} className="text-[16px]" />
+            <span>Starred</span>
+          </button>
           <div className="relative w-80 max-w-full">
             <Icon name="search" className="text-[18px] text-outline absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
             <input
@@ -210,7 +261,6 @@ export default function AllPhotosGrid({
             <div className="mb-space-md flex items-center justify-between">
               <div className="flex items-center gap-space-sm">
                 <span className="text-label-md font-label-md font-semibold text-on-surface">{g.label}</span>
-                <span className="text-outline text-body-sm font-body-sm">• {g.photos.length} items</span>
               </div>
               <div className="flex-1 h-[1px] bg-outline-variant/30 ml-space-md" />
             </div>
@@ -228,16 +278,32 @@ export default function AllPhotosGrid({
                     placeholder={photoPlaceholder}
                   />
                   {album && (
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        void removeFromAlbum(p.id);
-                      }}
-                      title="Remove from album"
-                      className="absolute top-1.5 right-1.5 w-7 h-7 rounded-full bg-black/60 hover:bg-error text-white opacity-0 group-hover:opacity-100 flex items-center justify-center transition-all z-10"
-                    >
-                      <Icon name="close" className="text-base" />
-                    </button>
+                    <>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          void setCover(p.id);
+                        }}
+                        title={coverId === p.id ? "Album cover" : "Set as album cover"}
+                        className={`absolute top-1.5 left-1.5 w-7 h-7 rounded-full flex items-center justify-center transition-all z-10 ${
+                          coverId === p.id
+                            ? "bg-primary text-on-primary opacity-100"
+                            : "bg-black/60 hover:bg-primary hover:text-on-primary text-white opacity-0 group-hover:opacity-100"
+                        }`}
+                      >
+                        <Icon name={coverId === p.id ? "check" : "wallpaper"} className="text-base" />
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          void removeFromAlbum(p.id);
+                        }}
+                        title="Remove from album"
+                        className="absolute top-1.5 right-1.5 w-7 h-7 rounded-full bg-black/60 hover:bg-error text-white opacity-0 group-hover:opacity-100 flex items-center justify-center transition-all z-10"
+                      >
+                        <Icon name="close" className="text-base" />
+                      </button>
+                    </>
                   )}
                   <div className="absolute inset-x-0 bottom-0 p-2 bg-gradient-to-t from-surface-dim/95 via-surface-dim/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex flex-col gap-1.5">
                     {p.persons.length > 0 && (
@@ -275,7 +341,7 @@ export default function AllPhotosGrid({
         ))}
 
         {hasMore && (
-          <div className="flex justify-center pt-2">
+          <div ref={sentinelRef} className="flex justify-center pt-2">
             <button
               onClick={() => loadPage(items.length, order, debounced, false)}
               disabled={loading}

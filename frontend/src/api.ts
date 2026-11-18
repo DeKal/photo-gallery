@@ -314,6 +314,7 @@ export interface PhotoListItem {
   face_count: number;
   person_count: number;
   persons: PhotoPerson[];
+  favorite?: boolean;
 }
 
 export interface PhotoListPage {
@@ -327,16 +328,34 @@ export function getPhotoPersons(photoId: number): Promise<PhotoPerson[]> {
   return request(`/photos/${photoId}/persons`);
 }
 
+// Favorite (star) state of a single photo, and a setter. The lightbox fetches
+// the state when a photo opens and toggles it with the star button.
+export function getPhotoFavorite(photoId: number): Promise<{ id: number; favorite: boolean }> {
+  return request(`/photos/${photoId}/favorite`);
+}
+
+export function setPhotoFavorite(
+  photoId: number,
+  favorite: boolean,
+): Promise<{ id: number; favorite: boolean }> {
+  return request(`/photos/${photoId}/favorite`, {
+    method: "PUT",
+    body: JSON.stringify({ favorite }),
+  });
+}
+
 export function getPhotos(
   limit = 120,
   offset = 0,
   order: PhotoOrder = "newest",
   q = "",
   album?: number,
+  favorites = false,
 ): Promise<PhotoListPage> {
   const qs = q.trim() ? `&q=${encodeURIComponent(q.trim())}` : "";
   const al = album != null ? `&album=${album}` : "";
-  return request(`/photos?limit=${limit}&offset=${offset}&order=${order}${qs}${al}`);
+  const fav = favorites ? `&favorites=true` : "";
+  return request(`/photos?limit=${limit}&offset=${offset}&order=${order}${qs}${al}${fav}`);
 }
 
 // ---- Albums --------------------------------------------------------------
@@ -381,5 +400,14 @@ export function removePhotosFromAlbum(id: number, photoIds: number[]): Promise<A
   return request(`/albums/${id}/photos`, {
     method: "DELETE",
     body: JSON.stringify({ photo_ids: photoIds }),
+  });
+}
+
+// Set the album cover. Pass a photoId to use that exact (member) photo, or null
+// to let the server pick a random member.
+export function setAlbumCover(id: number, photoId: number | null): Promise<Album> {
+  return request(`/albums/${id}/cover`, {
+    method: "PUT",
+    body: JSON.stringify({ photo_id: photoId }),
   });
 }

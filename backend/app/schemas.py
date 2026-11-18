@@ -76,6 +76,7 @@ class PhotoListItem(BaseModel):
     face_count: int = 0
     person_count: int = 0
     persons: list[PhotoPerson] = []
+    favorite: bool = False
 
 
 class PhotoListOut(BaseModel):
@@ -163,3 +164,26 @@ class AlbumPhotosRequest(BaseModel):
     """Request body for adding/removing photos from an album."""
 
     photo_ids: list[int]
+
+
+class AlbumCoverRequest(BaseModel):
+    """Request body for ``PUT /albums/{id}/cover``.
+
+    ``photo_id`` names the member photo to use as the cover; ``None`` asks the
+    server to pick a random member.
+    """
+
+    photo_id: Optional[int] = None
+
+
+class FavoriteRequest(BaseModel):
+    """Request body for ``PUT /photos/{id}/favorite``."""
+
+    favorite: bool
+
+
+class FavoriteOut(BaseModel):
+    """Favorite state of a single photo."""
+
+    id: int
+    favorite: bool

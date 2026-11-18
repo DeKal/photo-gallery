@@ -5,13 +5,19 @@ A pure DB read — lives on the slim ``api`` service alongside persons/sim.
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import and_, func, or_, select
 from sqlalchemy.orm import Session
 
 from app.db import get_session
 from app.models import Face, FacePerson, Person, Photo, PhotoAlbum
-from app.schemas import PhotoListItem, PhotoListOut, PhotoPerson
+from app.schemas import (
+    FavoriteOut,
+    FavoriteRequest,
+    PhotoListItem,
+    PhotoListOut,
+    PhotoPerson,
+)
 
 router = APIRouter()
 
@@ -25,6 +31,7 @@ def list_photos(
     order: str = Query(default="newest", pattern="^(newest|oldest)$"),
     q: str | None = Query(default=None),
     album: int | None = Query(default=None),
+    favorites: bool = Query(default=False),
     session: Session = Depends(get_session),
 ) -> PhotoListOut:
     """A page of successfully-indexed photos plus the total count.
@@ -37,9 +44,12 @@ def list_photos(
 
     ``q`` filters the whole library by file path **or** the name of any person
     present in the photo (case-insensitive substring). ``album`` restricts the
-    listing to photos belonging to that album.
+    listing to photos belonging to that album. ``favorites`` restricts it to
+    starred photos.
     """
     conds = [Photo.error.is_(None)]
+    if favorites:
+        conds.append(Photo.favorite.is_(True))
     if album is not None:
         conds.append(
             select(PhotoAlbum.photo_id)
@@ -122,6 +132,7 @@ def list_photos(
                 face_count=faces,
                 person_count=len(persons),
                 persons=persons,
+                favorite=p.favorite,
             )
         )
     return PhotoListOut(total=total, items=items)
@@ -146,3 +157,29 @@ def photo_persons(
     persons = [PhotoPerson(id=pid, name=name) for pid, name in rows]
     persons.sort(key=lambda x: (x.name is None, x.name or "", x.id))
     return persons
+
+
+@router.get("/photos/{photo_id}/favorite", response_model=FavoriteOut)
+def get_favorite(
+    photo_id: int, session: Session = Depends(get_session)
+) -> FavoriteOut:
+    """Whether a single photo is starred (for the lightbox star state)."""
+    photo = session.get(Photo, photo_id)
+    if photo is None:
+        raise HTTPException(status_code=404, detail="photo not found")
+    return FavoriteOut(id=photo.id, favorite=photo.favorite)
+
+
+@router.put("/photos/{photo_id}/favorite", response_model=FavoriteOut)
+def set_favorite(
+    photo_id: int,
+    body: FavoriteRequest,
+    session: Session = Depends(get_session),
+) -> FavoriteOut:
+    """Star or unstar a photo."""
+    photo = session.get(Photo, photo_id)
+    if photo is None:
+        raise HTTPException(status_code=404, detail="photo not found")
+    photo.favorite = body.favorite
+    session.commit()
+    return FavoriteOut(id=photo.id, favorite=photo.favorite)

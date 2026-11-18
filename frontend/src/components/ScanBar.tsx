@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { startScan, getScan, cluster, pickFolder, type Scan } from "../api";
+import { startScan, getScan, cluster, pickFolder, getAlbums, type Scan, type Album } from "../api";
 import Icon from "./Icon";
 
 interface Props {
@@ -22,8 +22,20 @@ export default function ScanBar({ onClustered, path, onPathChange }: Props) {
   const [phase, setPhase] = useState<Phase>("idle");
   const [error, setError] = useState<string | null>(null);
   // Optional album to ingest the scanned folder into (created on demand).
-  const [albumName, setAlbumName] = useState("");
+  // `albumSel` is the dropdown value: "" = none, an existing album name, or the
+  // "__new__" sentinel which reveals a text box for a brand-new name.
+  const [albums, setAlbums] = useState<Album[]>([]);
+  const [albumSel, setAlbumSel] = useState("");
+  const [newAlbum, setNewAlbum] = useState("");
+  const albumName = albumSel === "__new__" ? newAlbum : albumSel;
   const pollRef = useRef<number | null>(null);
+
+  // Load existing albums for the picker (refreshed after a scan completes).
+  useEffect(() => {
+    getAlbums()
+      .then(setAlbums)
+      .catch(() => setAlbums([]));
+  }, []);
 
   useEffect(() => {
     return () => {
@@ -151,18 +163,37 @@ export default function ScanBar({ onClustered, path, onPathChange }: Props) {
           )}
         </div>
         <div className="flex items-center gap-space-sm">
-          <div className="flex items-center bg-[#171922] border border-[#232736] rounded-xl px-3 py-2 shadow-inner focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-500/20 transition-all">
+          <div className="relative flex items-center bg-[#171922] border border-[#232736] rounded-xl pl-3 pr-2 py-2 shadow-inner focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-500/20 transition-all">
             <Icon name="collections_bookmark" className="text-outline mr-2 text-[18px]" />
-            <input
-              type="text"
-              data-testid="scan-album-input"
-              className="w-40 bg-transparent text-on-surface text-body-sm font-body-sm outline-none border-none p-0 focus:ring-0 placeholder:text-outline"
-              placeholder="Add to album…"
-              value={albumName}
-              onChange={(e) => setAlbumName(e.target.value)}
+            <select
+              data-testid="scan-album-select"
+              className="w-40 bg-transparent text-on-surface text-body-sm font-body-sm outline-none border-none p-0 pr-5 focus:ring-0 appearance-none cursor-pointer disabled:cursor-not-allowed [&>option]:bg-[#171922]"
+              value={albumSel}
+              onChange={(e) => setAlbumSel(e.target.value)}
               disabled={busy}
-            />
+            >
+              <option value="">No album</option>
+              {albums.map((a) => (
+                <option key={a.id} value={a.name}>{a.name}</option>
+              ))}
+              <option value="__new__">＋ New album…</option>
+            </select>
+            <Icon name="expand_more" className="text-[16px] text-outline absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none" />
           </div>
+          {albumSel === "__new__" && (
+            <div className="flex items-center bg-[#171922] border border-[#232736] rounded-xl px-3 py-2 shadow-inner focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-500/20 transition-all">
+              <input
+                type="text"
+                data-testid="scan-album-input"
+                autoFocus
+                className="w-40 bg-transparent text-on-surface text-body-sm font-body-sm outline-none border-none p-0 focus:ring-0 placeholder:text-outline"
+                placeholder="New album name…"
+                value={newAlbum}
+                onChange={(e) => setNewAlbum(e.target.value)}
+                disabled={busy}
+              />
+            </div>
+          )}
           <button
             data-testid="browse-btn"
             onClick={() => void onBrowse()}

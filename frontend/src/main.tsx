@@ -3,16 +3,17 @@ import { createRoot } from "react-dom/client";
 import App from "./App";
 import "./index.css";
 
-// Icon fonts render their ligature NAME as plain text until the font loads
-// (FOUT). Keep Material Symbols glyphs hidden until the font is ready, with a
-// timeout fallback so icons never stay invisible if loading fails.
-function revealIcons() {
+// Web fonts cause FOUT: Material Symbols render their ligature NAME as text, and
+// body/headline text shows a fallback then swaps to Inter/Space Grotesk. Hold the
+// app (and icons) hidden until the fonts resolve, with a timeout fallback so
+// nothing stays invisible if loading fails.
+function revealFonts() {
   document.documentElement.classList.add("fonts-ready");
 }
 if (document.fonts && "ready" in document.fonts) {
-  document.fonts.ready.then(revealIcons);
+  document.fonts.ready.then(revealFonts);
 }
-setTimeout(revealIcons, 3000);
+setTimeout(revealFonts, 3000);
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>

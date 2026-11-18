@@ -78,11 +78,12 @@ export default function AlbumsGrid({
     return (
       <AlbumView
         key={`album-${selected.id}`}
-        album={{ id: selected.id, name: selected.name }}
+        album={{ id: selected.id, name: selected.name, coverPhotoId: selected.cover_photo_id }}
         onBack={() => {
           setSelected(null);
           load();
         }}
+        onAlbumChanged={load}
         onOpenPerson={onOpenPerson}
         onOpenSimilar={onOpenSimilar}
       />

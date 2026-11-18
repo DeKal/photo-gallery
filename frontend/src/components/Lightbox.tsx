@@ -2,6 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import {
   imageSources,
   getPhotoPersons,
+  getPhotoFavorite,
+  setPhotoFavorite,
   downloadPhoto,
   getAlbums,
   getPhotoAlbums,
@@ -78,6 +80,35 @@ export default function Lightbox({ ids, index, onIndexChange, onClose, driveIds,
     };
   }, [id]);
 
+  // Favorite (star) state of the current photo. Fetched on open, toggled
+  // optimistically by the star button and reverted if the write fails.
+  const [favorite, setFavorite] = useState(false);
+  useEffect(() => {
+    if (id == null) return;
+    let alive = true;
+    setFavorite(false);
+    getPhotoFavorite(id)
+      .then((f) => {
+        if (alive) setFavorite(f.favorite);
+      })
+      .catch(() => {
+        if (alive) setFavorite(false);
+      });
+    return () => {
+      alive = false;
+    };
+  }, [id]);
+
+  const toggleFavorite = async () => {
+    const next = !favorite;
+    setFavorite(next);
+    try {
+      await setPhotoFavorite(id, next);
+    } catch {
+      setFavorite(!next);
+    }
+  };
+
   // Download + add-to-album actions. The album menu loads albums on open and is
   // dismissed whenever the viewed photo changes; `note` is a transient toast.
   // `memberIds` is which albums the current photo is already in, so the menu can
@@ -115,22 +146,20 @@ export default function Lightbox({ ids, index, onIndexChange, onClose, driveIds,
     }
   };
 
-  // Toggle membership: add if not in the album, remove if already in it.
+  // Toggle membership. A photo lives in one album only, so adding to an album
+  // moves it there (the backend drops any other membership) — reflect that by
+  // replacing the member set rather than adding to it.
   const toggleMembership = async (album: Album) => {
     const inIt = memberIds.has(album.id);
     try {
       if (inIt) {
         await removePhotosFromAlbum(album.id, [id]);
-        setMemberIds((s) => {
-          const n = new Set(s);
-          n.delete(album.id);
-          return n;
-        });
+        setMemberIds(new Set());
         flash(`Removed from ${album.name}`);
       } else {
         await addPhotosToAlbum(album.id, [id]);
-        setMemberIds((s) => new Set(s).add(album.id));
-        flash(`Added to ${album.name}`);
+        setMemberIds(new Set([album.id]));
+        flash(`Moved to ${album.name}`);
       }
     } catch {
       flash("Could not update album");
@@ -142,8 +171,8 @@ export default function Lightbox({ ids, index, onIndexChange, onClose, driveIds,
     try {
       const a = await createAlbum(name);
       await addPhotosToAlbum(a.id, [id]);
-      setMemberIds((s) => new Set(s).add(a.id));
-      flash(`Added to ${a.name}`);
+      setMemberIds(new Set([a.id]));
+      flash(`Moved to ${a.name}`);
     } catch {
       flash("Could not create album");
     }
@@ -192,13 +221,93 @@ export default function Lightbox({ ids, index, onIndexChange, onClose, driveIds,
       onClick={onClose}
       className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-[#0b0d12]/90 backdrop-blur-lg cursor-zoom-out"
     >
-      <button
-        aria-label="Close"
-        onClick={onClose}
-        className="fixed top-4 right-4 w-10 h-10 rounded-full bg-[#171922]/80 backdrop-blur-md border border-white/10 text-on-surface hover:text-white hover:border-white/30 flex items-center justify-center transition-all"
-      >
-        <Icon name="close" className="text-xl" />
-      </button>
+      {/* Top-right controls: star, prominent download, close. */}
+      <div className="fixed top-4 right-4 z-10 flex items-center gap-2">
+        <button
+          data-testid="lightbox-favorite-top"
+          aria-pressed={favorite}
+          onClick={(e) => {
+            e.stopPropagation();
+            void toggleFavorite();
+          }}
+          title={favorite ? "Starred" : "Star photo"}
+          className={`h-10 px-space-md rounded-full backdrop-blur-md border font-label-md text-label-md active:scale-[0.98] transition-all flex items-center gap-2 ${
+            favorite
+              ? "bg-amber-400/15 border-amber-400/40 text-amber-400 hover:text-amber-300"
+              : "bg-[#171922]/80 border-white/10 text-on-surface hover:text-white hover:border-white/30"
+          }`}
+        >
+          <Icon name={favorite ? "star" : "star_border"} className="text-base" />
+          {favorite ? "Starred" : "Star"}
+        </button>
+        <button
+          data-testid="lightbox-download"
+          onClick={(e) => {
+            e.stopPropagation();
+            void downloadPhoto(id, driveId);
+          }}
+          title="Download photo"
+          className="h-10 px-space-md rounded-full bg-gradient-to-r from-indigo-500 to-violet-600 hover:opacity-90 text-white font-label-md text-label-md shadow-lg shadow-indigo-500/30 active:scale-[0.98] transition-all flex items-center gap-2"
+        >
+          <Icon name="download" className="text-base" />
+          Download
+        </button>
+        <button
+          aria-label="Close"
+          onClick={onClose}
+          className="w-10 h-10 rounded-full bg-[#171922]/80 backdrop-blur-md border border-white/10 text-on-surface hover:text-white hover:border-white/30 flex items-center justify-center transition-all"
+        >
+          <Icon name="close" className="text-xl" />
+        </button>
+      </div>
+
+      {/* Add to album — top-left, menu opens downward. */}
+      <div className="fixed top-4 left-4 z-10" onClick={(e) => e.stopPropagation()}>
+        <button
+          data-testid="lightbox-add-album"
+          onClick={() => void toggleAlbumMenu()}
+          title="Add to album"
+          className="h-10 px-space-md rounded-full bg-[#171922]/80 backdrop-blur-md border border-white/10 hover:border-white/30 text-on-surface hover:text-white font-label-md text-label-md active:scale-[0.98] transition-all flex items-center gap-2"
+        >
+          <Icon name="bookmark_add" className="text-base" />
+          Add to album
+        </button>
+        {albumMenu && (
+          <div className="absolute top-full mt-2 left-0 w-56 max-h-72 overflow-y-auto custom-scroll rounded-xl bg-[#171922] border border-white/10 shadow-2xl py-1 z-10">
+            <button
+              onClick={() => {
+                setAlbumMenu(false);
+                setNewAlbumOpen(true);
+              }}
+              className="w-full flex items-center gap-2 px-3 py-2 text-label-md font-label-md text-primary hover:bg-white/5 transition-colors"
+            >
+              <Icon name="add" className="text-base" />
+              New album…
+            </button>
+            {albums.length > 0 && <div className="my-1 h-px bg-white/10" />}
+            {albums.map((a) => {
+              const inIt = memberIds.has(a.id);
+              return (
+                <button
+                  key={a.id}
+                  onClick={() => void toggleMembership(a)}
+                  title={inIt ? `Remove from ${a.name}` : `Add to ${a.name}`}
+                  className="w-full flex items-center justify-between gap-2 px-3 py-2 text-label-md font-label-md text-on-surface hover:bg-white/5 transition-colors"
+                >
+                  <span className="flex items-center gap-2 truncate">
+                    <Icon
+                      name={inIt ? "check_circle" : "collections_bookmark"}
+                      className={`text-base shrink-0 ${inIt ? "text-emerald-400" : "text-outline"}`}
+                    />
+                    <span className={`truncate ${inIt ? "text-white" : ""}`}>{a.name}</span>
+                  </span>
+                  <span className="text-outline text-label-sm shrink-0">{a.photo_count}</span>
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
 
       {/* Prev */}
       {hasPrev && (
@@ -250,75 +359,22 @@ export default function Lightbox({ ids, index, onIndexChange, onClose, driveIds,
               <Icon name="progress_activity" className="text-3xl text-white/80 animate-spin" />
             </div>
           )}
+          {/* More like this — floating over the image, bottom-centered. */}
+          {onOpenSimilar && (
+            <button
+              data-testid="lightbox-action"
+              onClick={(e) => {
+                e.stopPropagation();
+                onOpenSimilar(id);
+              }}
+              className="absolute bottom-4 left-1/2 -translate-x-1/2 whitespace-nowrap px-space-lg py-2 rounded-full bg-gradient-to-r from-indigo-500 to-violet-600 hover:opacity-90 text-white font-label-md text-label-md shadow-lg shadow-indigo-500/30 ring-1 ring-white/20 active:scale-[0.98] transition-all flex items-center gap-2"
+            >
+              <Icon name="auto_awesome" className="text-base" />
+              More like this
+            </button>
+          )}
         </div>
         <div className="mt-4 flex flex-col items-center gap-3">
-          <div className="flex flex-wrap items-center justify-center gap-2">
-            {onOpenSimilar && (
-              <button
-                data-testid="lightbox-action"
-                onClick={() => onOpenSimilar(id)}
-                className="px-space-lg py-2 rounded-full bg-gradient-to-r from-indigo-500 to-violet-600 hover:opacity-90 text-white font-label-md text-label-md shadow-lg shadow-indigo-500/30 active:scale-[0.98] transition-all flex items-center gap-2"
-              >
-                <Icon name="auto_awesome" className="text-base" />
-                More like this
-              </button>
-            )}
-            <button
-              data-testid="lightbox-download"
-              onClick={() => void downloadPhoto(id, driveId)}
-              title="Download photo"
-              className="px-space-lg py-2 rounded-full bg-[#171922]/90 border border-white/10 hover:border-white/30 text-on-surface hover:text-white font-label-md text-label-md active:scale-[0.98] transition-all flex items-center gap-2"
-            >
-              <Icon name="download" className="text-base" />
-              Download
-            </button>
-            <div className="relative">
-              <button
-                data-testid="lightbox-add-album"
-                onClick={() => void toggleAlbumMenu()}
-                title="Add to album"
-                className="px-space-lg py-2 rounded-full bg-[#171922]/90 border border-white/10 hover:border-white/30 text-on-surface hover:text-white font-label-md text-label-md active:scale-[0.98] transition-all flex items-center gap-2"
-              >
-                <Icon name="bookmark_add" className="text-base" />
-                Add to album
-              </button>
-              {albumMenu && (
-                <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 w-56 max-h-72 overflow-y-auto custom-scroll rounded-xl bg-[#171922] border border-white/10 shadow-2xl py-1 z-10">
-                  <button
-                    onClick={() => {
-                      setAlbumMenu(false);
-                      setNewAlbumOpen(true);
-                    }}
-                    className="w-full flex items-center gap-2 px-3 py-2 text-label-md font-label-md text-primary hover:bg-white/5 transition-colors"
-                  >
-                    <Icon name="add" className="text-base" />
-                    New album…
-                  </button>
-                  {albums.length > 0 && <div className="my-1 h-px bg-white/10" />}
-                  {albums.map((a) => {
-                    const inIt = memberIds.has(a.id);
-                    return (
-                      <button
-                        key={a.id}
-                        onClick={() => void toggleMembership(a)}
-                        title={inIt ? `Remove from ${a.name}` : `Add to ${a.name}`}
-                        className="w-full flex items-center justify-between gap-2 px-3 py-2 text-label-md font-label-md text-on-surface hover:bg-white/5 transition-colors"
-                      >
-                        <span className="flex items-center gap-2 truncate">
-                          <Icon
-                            name={inIt ? "check_circle" : "collections_bookmark"}
-                            className={`text-base shrink-0 ${inIt ? "text-emerald-400" : "text-outline"}`}
-                          />
-                          <span className={`truncate ${inIt ? "text-white" : ""}`}>{a.name}</span>
-                        </span>
-                        <span className="text-outline text-label-sm shrink-0">{a.photo_count}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-          </div>
           {note && (
             <div className="text-label-sm font-label-sm text-emerald-400 flex items-center gap-1.5">
               <Icon name="check_circle" className="text-base" />

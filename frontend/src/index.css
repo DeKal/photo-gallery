@@ -15,6 +15,18 @@ body,
   min-height: 100vh;
 }
 
+/* Hold app content hidden until web fonts resolve, so text doesn't visibly swap
+   font-family (Inter/Space Grotesk FOUT) on load. The dark background canvas is
+   on <body>, so it stays painted during the brief wait; fonts-ready fades the
+   content in. A 3s JS timeout flips fonts-ready even if font loading stalls. */
+#root {
+  opacity: 0;
+}
+html.fonts-ready #root {
+  opacity: 1;
+  transition: opacity 0.15s ease;
+}
+
 body {
   background-color: #0b0d12;
   /* Faint indigo/violet ambient glows, top-right and bottom-left. */
@@ -38,11 +50,18 @@ body {
   vertical-align: middle;
   line-height: 1;
   user-select: none;
-  /* Hide the ligature NAME (e.g. "refresh") until the icon font loads. */
+  /* Before the icon font loads, hide the ligature NAME (e.g. "refresh") AND clamp
+     the box to ~1 glyph wide so the raw word doesn't reserve a huge blank that
+     collapses (shifting neighbouring text) once the font swaps in. */
   visibility: hidden;
+  width: 1em;
+  overflow: hidden;
+  white-space: nowrap;
 }
 html.fonts-ready .material-symbols-outlined {
   visibility: visible;
+  width: auto;
+  overflow: visible;
 }
 
 /* ---- Ported Stitch utility classes (verbatim from code.html) ------------- */

@@ -13,3 +13,6 @@ CREATE TABLE IF NOT EXISTS photo_album (
 );
 
 ALTER TABLE scans ADD COLUMN IF NOT EXISTS album_id INTEGER REFERENCES albums(id);
+
+-- Chosen cover photo for the album card. NULL means "derive it" (first member).
+ALTER TABLE albums ADD COLUMN IF NOT EXISTS cover_photo_id INTEGER REFERENCES photos(id);

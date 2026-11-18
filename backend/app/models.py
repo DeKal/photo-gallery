@@ -25,6 +25,10 @@ class Photo(Base):
     drive_file_id: Mapped[str | None] = mapped_column(String, nullable=True)
     error: Mapped[str | None] = mapped_column(String, nullable=True)
     scanned_at: Mapped[datetime | None] = mapped_column(nullable=True)
+    # User-starred favorite, toggled from the lightbox.
+    favorite: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="false"
+    )
 
 
 class ImageEmbedding(Base):
@@ -113,15 +117,23 @@ class Album(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String, nullable=False)
     created_at: Mapped[datetime | None] = mapped_column(nullable=True)
+    # User-chosen cover photo; NULL falls back to the first member photo.
+    cover_photo_id: Mapped[int | None] = mapped_column(
+        ForeignKey("photos.id"), nullable=True
+    )
 
 
 class PhotoAlbum(Base):
-    """Many-to-many membership: a photo may belong to several albums."""
+    """Album membership: a photo belongs to exactly one album.
+
+    ``photo_id`` is unique, so adding a photo to an album moves it out of any
+    other (enforced in ``add_photos_to_album``).
+    """
 
     __tablename__ = "photo_album"
 
     photo_id: Mapped[int] = mapped_column(
-        ForeignKey("photos.id"), primary_key=True
+        ForeignKey("photos.id"), primary_key=True, unique=True
     )
     album_id: Mapped[int] = mapped_column(
         ForeignKey("albums.id"), primary_key=True
