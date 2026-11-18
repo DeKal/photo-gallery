@@ -52,6 +52,18 @@ CREATE TABLE IF NOT EXISTS photo_sim_cluster (
     sim_cluster_id INTEGER NOT NULL REFERENCES sim_clusters(id)
 );
 
+CREATE TABLE IF NOT EXISTS albums (
+    id SERIAL PRIMARY KEY,
+    name TEXT NOT NULL,
+    created_at TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS photo_album (
+    photo_id INTEGER NOT NULL REFERENCES photos(id),
+    album_id INTEGER NOT NULL REFERENCES albums(id),
+    PRIMARY KEY (photo_id, album_id)
+);
+
 CREATE TABLE IF NOT EXISTS scans (
     id SERIAL PRIMARY KEY,
     root_path TEXT NOT NULL,
@@ -59,7 +71,8 @@ CREATE TABLE IF NOT EXISTS scans (
     done INTEGER NOT NULL DEFAULT 0,
     total INTEGER NOT NULL DEFAULT 0,
     started_at TIMESTAMP,
-    finished_at TIMESTAMP
+    finished_at TIMESTAMP,
+    album_id INTEGER REFERENCES albums(id)
 );
 
 CREATE INDEX IF NOT EXISTS idx_image_emb_vec ON image_embeddings USING ivfflat (vec vector_cosine_ops) WITH (lists=100);

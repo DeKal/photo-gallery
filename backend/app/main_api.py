@@ -13,6 +13,7 @@ host); the combined all-in-one app for simple local dev is ``app.main``.
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.api.albums import router as albums_router
 from app.api.media import router as media_router
 from app.api.persons import router as persons_router
 from app.api.photos import router as photos_router
@@ -37,4 +38,5 @@ def health() -> dict[str, str]:
 app.include_router(persons_router)
 app.include_router(sim_router)
 app.include_router(photos_router)
+app.include_router(albums_router)
 app.include_router(media_router)

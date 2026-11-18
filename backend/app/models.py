@@ -100,3 +100,29 @@ class Scan(Base):
     total: Mapped[int] = mapped_column(default=0)
     started_at: Mapped[datetime | None] = mapped_column(nullable=True)
     finished_at: Mapped[datetime | None] = mapped_column(nullable=True)
+    # When set, every photo this scan touches (new or already-indexed) is added
+    # to this album. Lets a user scan a folder straight into e.g. "Wedding".
+    album_id: Mapped[int | None] = mapped_column(
+        ForeignKey("albums.id"), nullable=True
+    )
+
+
+class Album(Base):
+    __tablename__ = "albums"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String, nullable=False)
+    created_at: Mapped[datetime | None] = mapped_column(nullable=True)
+
+
+class PhotoAlbum(Base):
+    """Many-to-many membership: a photo may belong to several albums."""
+
+    __tablename__ = "photo_album"
+
+    photo_id: Mapped[int] = mapped_column(
+        ForeignKey("photos.id"), primary_key=True
+    )
+    album_id: Mapped[int] = mapped_column(
+        ForeignKey("albums.id"), primary_key=True
+    )

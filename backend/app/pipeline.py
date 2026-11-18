@@ -67,9 +67,14 @@ def run_scan(scan_id: int) -> None:
         scan.total = len(files)
         session.commit()
 
+        # Photo ids this scan touched (new or already-indexed), so they can be
+        # added to the scan's target album once the walk finishes.
+        touched_ids: list[int] = []
         for index, path in enumerate(files, start=1):
             try:
-                _process_file(session, path, drive_ids)
+                photo_id = _process_file(session, path, drive_ids)
+                if photo_id is not None:
+                    touched_ids.append(photo_id)
             except Exception as exc:  # noqa: BLE001 - one bad file must not abort
                 logger.exception("run_scan: failed to process %s", path)
                 _record_error(session, path, exc)
@@ -77,6 +82,13 @@ def run_scan(scan_id: int) -> None:
             scan.done += 1
             if index % _COMMIT_EVERY == 0:
                 session.commit()
+
+        if scan.album_id is not None and touched_ids:
+            # Imported here (not top-level) to keep the import local to the one
+            # place the pipeline needs it.
+            from app.api.albums import add_photos_to_album
+
+            add_photos_to_album(session, scan.album_id, touched_ids)
 
         scan.status = "completed"
         scan.finished_at = datetime.now(timezone.utc)
@@ -94,28 +106,36 @@ def run_scan(scan_id: int) -> None:
         session.close()
 
 
-def _process_file(session, path, drive_ids: dict[str, str] | None = None) -> None:
-    """Index a single image file: thumbnail, photo row, CLIP + face embeddings."""
+def _process_file(session, path, drive_ids: dict[str, str] | None = None) -> int | None:
+    """Index a single image file: thumbnail, photo row, CLIP + face embeddings.
+
+    Returns the photo id (new or already-indexed) so the caller can add it to a
+    scan's target album; ``None`` only if the row could not be identified.
+    """
     sha = file_sha256(path)
     existing = session.query(Photo).filter(Photo.sha256 == sha).first()
     if existing is not None:
-        return  # Already indexed (idempotent / dedup).
+        return existing.id  # Already indexed (idempotent / dedup).
 
     img = load_image(path)
     thumb = make_thumbnail(path, settings.thumb_dir, sha256=sha)
     width, height = img.size
 
     drive_file_id = (drive_ids or {}).get(str(Path(path).resolve()))
+    # taken_at is never left null: EXIF capture time, then the file's mtime
+    # (both via file_taken_at), finally the scan time as a last resort — so the
+    # library always has a date to sort/group by.
+    now = datetime.now(timezone.utc)
     photo = Photo(
         path=str(path),
         sha256=sha,
         width=width,
         height=height,
-        taken_at=file_taken_at(path),
+        taken_at=file_taken_at(path) or now,
         thumb_path=str(thumb),
         thumb_data=Path(thumb).read_bytes(),
         drive_file_id=drive_file_id,
-        scanned_at=datetime.now(timezone.utc),
+        scanned_at=now,
     )
     session.add(photo)
     session.flush()  # Assigns photo.id.
@@ -137,6 +157,8 @@ def _process_file(session, path, drive_ids: dict[str, str] | None = None) -> Non
         )
         face_row.thumb_path = str(thumb_path)
         face_row.thumb_data = Path(thumb_path).read_bytes()
+
+    return photo.id
 
 
 def _record_error(session, path, exc: Exception) -> None:

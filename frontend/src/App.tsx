@@ -4,8 +4,9 @@ import ScanBar from "./components/ScanBar";
 import PeopleGrid from "./components/PeopleGrid";
 import SimilarGrid from "./components/SimilarGrid";
 import AllPhotosGrid from "./components/AllPhotosGrid";
+import AlbumsGrid from "./components/AlbumsGrid";
 import Icon from "./components/Icon";
-import { getPersons, getSimClusters, getPhotos, pickFolder } from "./api";
+import { getPersons, getSimClusters, getPhotos, getAlbums, pickFolder } from "./api";
 
 // Prod deploys (e.g. Vercel) have no ML worker, so scanning and folder import
 // are unavailable. VITE_NO_WORKER=1 hides that UI; browsing + curation (which
@@ -16,7 +17,7 @@ export default function App() {
   const [nav, setNav] = useState<NavKey>("all");
   const [refreshKey, setRefreshKey] = useState(0);
   const [scanPath, setScanPath] = useState("");
-  const [counts, setCounts] = useState<Counts>({ all: null, people: null, similar: null, hidden: null });
+  const [counts, setCounts] = useState<Counts>({ all: null, people: null, similar: null, hidden: null, albums: null });
   // Person to auto-open in the People view (e.g. clicked from All Photos). The
   // nonce lets the same person be re-focused after you navigate away and back.
   const [focus, setFocus] = useState<{ id: number; n: number } | null>(null);
@@ -47,6 +48,9 @@ export default function App() {
       .catch(() => {});
     getPhotos(1, 0, "newest")
       .then((page) => setCounts((c) => ({ ...c, all: page.total })))
+      .catch(() => {});
+    getAlbums()
+      .then((a) => setCounts((c) => ({ ...c, albums: a.length })))
       .catch(() => {});
   }, [refreshKey]);
 
@@ -143,6 +147,7 @@ export default function App() {
       )}
       {nav === "similar" && <SimilarGrid key={`similar-${refreshKey}`} focus={simFocus} onOpenPerson={openPerson} onOpenSimilar={openSimilar} />}
       {nav === "all" && <AllPhotosGrid key={`all-${refreshKey}`} onOpenPerson={openPerson} onOpenSimilar={openSimilar} />}
+      {nav === "albums" && <AlbumsGrid key={`albums-${refreshKey}`} onOpenPerson={openPerson} onOpenSimilar={openSimilar} />}
     </AppShell>
   );
 }

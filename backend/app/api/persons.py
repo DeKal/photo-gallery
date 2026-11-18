@@ -2,12 +2,12 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.db import get_session
-from app.models import Face, FacePerson, Person, Photo
+from app.models import Face, FacePerson, Person, Photo, PhotoAlbum
 from app.schemas import (
     FaceOut,
     MergeRequest,
@@ -21,60 +21,101 @@ from app.schemas import (
 router = APIRouter()
 
 
-def _face_count(session: Session, person_id: int) -> int:
-    """Number of faces assigned to ``person_id``."""
-    return (
-        session.execute(
-            select(func.count())
-            .select_from(FacePerson)
-            .where(FacePerson.person_id == person_id)
-        ).scalar_one()
+def _face_count(
+    session: Session, person_id: int, album_id: int | None = None
+) -> int:
+    """Number of faces assigned to ``person_id``.
+
+    When ``album_id`` is given, counts only faces whose photo is in that album,
+    so a person's size reflects the album being browsed rather than the library.
+    """
+    stmt = (
+        select(func.count(func.distinct(FacePerson.face_id)))
+        .select_from(FacePerson)
+        .where(FacePerson.person_id == person_id)
     )
+    if album_id is not None:
+        stmt = stmt.join(Face, Face.id == FacePerson.face_id).join(
+            PhotoAlbum, PhotoAlbum.photo_id == Face.photo_id
+        ).where(PhotoAlbum.album_id == album_id)
+    return session.execute(stmt).scalar_one()
 
 
-def _cover_photo_id(session: Session, person: Person) -> int | None:
-    """Photo of the cover face if set, else a photo of any member face."""
+def _cover_photo_id(
+    session: Session, person: Person, album_id: int | None = None
+) -> int | None:
+    """Photo of the cover face if set, else a photo of any member face.
+
+    When ``album_id`` is given, the chosen photo is constrained to the album, so
+    an album card never shows a cover from outside the album.
+    """
     if person.cover_face_id is not None:
-        photo_id = session.execute(
-            select(Face.photo_id).where(Face.id == person.cover_face_id)
-        ).scalar_one_or_none()
+        stmt = select(Face.photo_id).where(Face.id == person.cover_face_id)
+        if album_id is not None:
+            stmt = stmt.join(
+                PhotoAlbum, PhotoAlbum.photo_id == Face.photo_id
+            ).where(PhotoAlbum.album_id == album_id)
+        photo_id = session.execute(stmt).scalar_one_or_none()
         if photo_id is not None:
             return photo_id
 
-    return session.execute(
+    stmt = (
         select(Face.photo_id)
         .join(FacePerson, FacePerson.face_id == Face.id)
         .where(FacePerson.person_id == person.id)
         .order_by(Face.id)
         .limit(1)
-    ).scalar_one_or_none()
+    )
+    if album_id is not None:
+        stmt = stmt.join(
+            PhotoAlbum, PhotoAlbum.photo_id == Face.photo_id
+        ).where(PhotoAlbum.album_id == album_id)
+    return session.execute(stmt).scalar_one_or_none()
 
 
-def _person_out(session: Session, person: Person) -> PersonOut:
-    """Build a ``PersonOut`` for ``person`` (one count + one cover query each)."""
+def _person_out(
+    session: Session, person: Person, album_id: int | None = None
+) -> PersonOut:
+    """Build a ``PersonOut`` for ``person`` (one count + one cover query each).
+
+    ``album_id`` scopes the count and cover to a single album when set.
+    """
     return PersonOut(
         id=person.id,
         name=person.name,
         cover_face_id=person.cover_face_id,
-        cover_photo_id=_cover_photo_id(session, person),
-        face_count=_face_count(session, person.id),
+        cover_photo_id=_cover_photo_id(session, person, album_id),
+        face_count=_face_count(session, person.id, album_id),
         hidden=person.hidden,
     )
 
 
 @router.get("/persons", response_model=list[PersonOut])
 def list_persons(
-    include_hidden: bool = False, session: Session = Depends(get_session)
+    include_hidden: bool = False,
+    album: int | None = Query(default=None),
+    session: Session = Depends(get_session),
 ) -> list[PersonOut]:
     """List person clusters, ordered by face count descending.
 
     Hidden (soft-hidden) clusters are excluded unless ``include_hidden`` is set.
+    When ``album`` is given, only persons with at least one face in that album
+    are returned, and their counts/covers are scoped to the album.
     """
     stmt = select(Person)
     if not include_hidden:
         stmt = stmt.where(Person.hidden.is_(False))
+    if album is not None:
+        stmt = stmt.where(
+            Person.id.in_(
+                select(FacePerson.person_id)
+                .join(Face, Face.id == FacePerson.face_id)
+                .join(PhotoAlbum, PhotoAlbum.photo_id == Face.photo_id)
+                .where(PhotoAlbum.album_id == album)
+            )
+        )
     persons = session.execute(stmt).scalars().all()
-    out = [_person_out(session, p) for p in persons]
+    out = [_person_out(session, p, album) for p in persons]
     out.sort(key=lambda p: p.face_count, reverse=True)
     return out
 
@@ -108,57 +149,80 @@ def unhide_person(
 
 @router.get("/persons/{person_id}", response_model=PersonOut)
 def get_person(
-    person_id: int, session: Session = Depends(get_session)
+    person_id: int,
+    album: int | None = Query(default=None),
+    session: Session = Depends(get_session),
 ) -> PersonOut:
-    """Return a single person cluster, or 404 if it does not exist."""
+    """Return a single person cluster, or 404 if it does not exist.
+
+    ``album`` scopes the face/photo counts and cover to one album when set.
+    """
     person = session.get(Person, person_id)
     if person is None:
         raise HTTPException(status_code=404, detail="person not found")
-    return _person_out(session, person)
+    return _person_out(session, person, album)
 
 
 @router.get("/persons/{person_id}/photos", response_model=list[PhotoOut])
 def list_person_photos(
-    person_id: int, session: Session = Depends(get_session)
+    person_id: int,
+    album: int | None = Query(default=None),
+    session: Session = Depends(get_session),
 ) -> list[Photo]:
-    """Distinct photos that have at least one face assigned to this person."""
+    """Distinct photos that have at least one face assigned to this person.
+
+    When ``album`` is given, restricted to photos that are in the album.
+    """
     person = session.get(Person, person_id)
     if person is None:
         raise HTTPException(status_code=404, detail="person not found")
 
+    stmt = (
+        select(Photo)
+        .join(Face, Face.photo_id == Photo.id)
+        .join(FacePerson, FacePerson.face_id == Face.id)
+        .where(FacePerson.person_id == person_id)
+    )
+    if album is not None:
+        stmt = stmt.join(
+            PhotoAlbum, PhotoAlbum.photo_id == Photo.id
+        ).where(PhotoAlbum.album_id == album)
     photos = (
-        session.execute(
-            select(Photo)
-            .join(Face, Face.photo_id == Photo.id)
-            .join(FacePerson, FacePerson.face_id == Face.id)
-            .where(FacePerson.person_id == person_id)
-            .distinct()
-            .order_by(Photo.id)
-        )
-        .scalars()
-        .all()
+        session.execute(stmt.distinct().order_by(Photo.id)).scalars().all()
     )
     return list(photos)
 
 
 @router.get("/persons/{person_id}/faces", response_model=list[FaceOut])
 def list_person_faces(
-    person_id: int, session: Session = Depends(get_session)
+    person_id: int,
+    album: int | None = Query(default=None),
+    limit: int = Query(default=30, ge=1, le=500),
+    session: Session = Depends(get_session),
 ) -> list[FaceOut]:
-    """Member faces of a person, best (highest det_score) first.
+    """The person's best member faces, highest ``det_score`` first.
 
-    Used by the UI to offer alternative cover faces to choose from.
+    Used by the UI to offer alternative cover faces. Capped at ``limit`` (30 by
+    default) so a person with hundreds of detections shows only the best ones
+    rather than an unwieldy wall of faces. When ``album`` is given, only faces
+    whose photo is in the album are considered.
     """
     person = session.get(Person, person_id)
     if person is None:
         raise HTTPException(status_code=404, detail="person not found")
 
+    stmt = (
+        select(Face)
+        .join(FacePerson, FacePerson.face_id == Face.id)
+        .where(FacePerson.person_id == person_id)
+    )
+    if album is not None:
+        stmt = stmt.join(
+            PhotoAlbum, PhotoAlbum.photo_id == Face.photo_id
+        ).where(PhotoAlbum.album_id == album)
     faces = (
         session.execute(
-            select(Face)
-            .join(FacePerson, FacePerson.face_id == Face.id)
-            .where(FacePerson.person_id == person_id)
-            .order_by(Face.det_score.desc(), Face.id)
+            stmt.order_by(Face.det_score.desc(), Face.id).limit(limit)
         )
         .scalars()
         .all()

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { getPhotos, thumbSources, type PhotoListItem, type PhotoOrder } from "../api";
+import { getPhotos, getAlbums, removePhotosFromAlbum, thumbSources, type Album, type PhotoListItem, type PhotoOrder } from "../api";
 import ImgWithFallback from "./ImgWithFallback";
 import Lightbox from "./Lightbox";
 import Icon from "./Icon";
@@ -31,9 +31,19 @@ function monthLabel(takenAt: string | null): string {
 export default function AllPhotosGrid({
   onOpenPerson,
   onOpenSimilar,
+  album,
+  onBack,
+  embedded = false,
 }: {
   onOpenPerson?: (id: number) => void;
   onOpenSimilar?: (id: number) => void;
+  // When set, the grid shows only this album's photos, with a back button and a
+  // per-photo remove-from-album action.
+  album?: { id: number; name: string };
+  onBack?: () => void;
+  // When embedded in the album-detail tabs, the owning view already renders the
+  // Back button + album title, so the grid drops its own (keeps count + search).
+  embedded?: boolean;
 }) {
   const [items, setItems] = useState<PhotoListItem[]>([]);
   const [total, setTotal] = useState(0);
@@ -43,10 +53,16 @@ export default function AllPhotosGrid({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lightbox, setLightbox] = useState<number | null>(null);
+  // In the global library view, let the user narrow to a single album. When the
+  // grid is already pinned to an album (album-detail), this picker is hidden and
+  // the pinned album wins.
+  const [albums, setAlbums] = useState<Album[]>([]);
+  const [albumFilter, setAlbumFilter] = useState<number | null>(null);
 
+  const albumId = album?.id ?? albumFilter ?? undefined;
   const loadPage = useCallback((offset: number, ord: PhotoOrder, q: string, replace: boolean) => {
     setLoading(true);
-    getPhotos(PAGE, offset, ord, q)
+    getPhotos(PAGE, offset, ord, q, albumId)
       .then((page) => {
         setTotal(page.total);
         setItems((prev) => (replace ? page.items : [...prev, ...page.items]));
@@ -54,7 +70,26 @@ export default function AllPhotosGrid({
       })
       .catch((e) => setError(e instanceof Error ? e.message : String(e)))
       .finally(() => setLoading(false));
-  }, []);
+  }, [albumId]);
+
+  // Album options for the library-view filter (not needed when album-pinned).
+  useEffect(() => {
+    if (album) return;
+    getAlbums()
+      .then(setAlbums)
+      .catch(() => setAlbums([]));
+  }, [album]);
+
+  const removeFromAlbum = async (photoId: number) => {
+    if (albumId == null) return;
+    try {
+      await removePhotosFromAlbum(albumId, [photoId]);
+      setItems((prev) => prev.filter((p) => p.id !== photoId));
+      setTotal((t) => Math.max(0, t - 1));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    }
+  };
 
   // Debounce the search box so each keystroke doesn't hit the API.
   useEffect(() => {
@@ -91,14 +126,42 @@ export default function AllPhotosGrid({
     <section className="flex flex-col flex-1">
       {/* Toolbar row */}
       <div className="px-margin-md lg:px-margin-lg pt-space-lg pb-space-md border-b border-outline-variant/40 flex flex-wrap items-center justify-between gap-space-md bg-surface/50 backdrop-blur-sm">
-        <div className="flex items-center gap-space-sm">
-          <h1 className="text-headline-md font-headline-md font-semibold text-on-surface tracking-tight">All Photos</h1>
+        <div className="flex items-center gap-space-md">
+          {!embedded && album && onBack && (
+            <button
+              onClick={onBack}
+              className="px-space-md py-1.5 rounded-xl bg-surface-container border border-outline-variant hover:border-outline text-on-surface text-label-md font-label-md flex items-center gap-1.5 hover:bg-surface-container-high transition-colors"
+            >
+              <Icon name="arrow_back" className="text-base" />
+              Back
+            </button>
+          )}
+          {!embedded && (
+            <h1 className="text-headline-md font-headline-md font-semibold text-on-surface tracking-tight">{album ? album.name : "All Photos"}</h1>
+          )}
           <span className="px-space-sm py-0.5 rounded-full bg-surface-container-high border border-outline-variant/40 text-on-surface-variant text-label-sm font-label-sm">
-            {total} photos indexed
+            {total} photos{album || albumFilter != null ? " in album" : " indexed"}
           </span>
         </div>
 
         <div className="flex items-center gap-space-sm">
+          {!album && (
+            <div className="relative">
+              <Icon name="collections_bookmark" className="text-[16px] text-outline absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <select
+                data-testid="album-filter"
+                value={albumFilter ?? ""}
+                onChange={(e) => setAlbumFilter(e.target.value ? Number(e.target.value) : null)}
+                className="h-11 pl-9 pr-8 appearance-none rounded-xl bg-surface-container border border-outline-variant/60 text-on-surface text-label-md font-label-md hover:bg-surface-container-high focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all cursor-pointer"
+              >
+                <option value="">All albums</option>
+                {albums.map((a) => (
+                  <option key={a.id} value={a.id}>{a.name}</option>
+                ))}
+              </select>
+              <Icon name="expand_more" className="text-[16px] text-outline absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+            </div>
+          )}
           <div className="relative w-80 max-w-full">
             <Icon name="search" className="text-[18px] text-outline absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
             <input
@@ -134,7 +197,11 @@ export default function AllPhotosGrid({
         )}
         {!loading && items.length === 0 && (
           <div className="text-outline py-12 text-center">
-            {debounced ? `No photos match “${debounced}”.` : "No photos yet. Scan a folder to get started."}
+            {debounced
+              ? `No photos match “${debounced}”.`
+              : album
+                ? "No photos in this album yet. Open a photo and use “Add to album”, or scan a folder into it."
+                : "No photos yet. Scan a folder to get started."}
           </div>
         )}
 
@@ -160,10 +227,22 @@ export default function AllPhotosGrid({
                     alt={p.path}
                     placeholder={photoPlaceholder}
                   />
+                  {album && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        void removeFromAlbum(p.id);
+                      }}
+                      title="Remove from album"
+                      className="absolute top-1.5 right-1.5 w-7 h-7 rounded-full bg-black/60 hover:bg-error text-white opacity-0 group-hover:opacity-100 flex items-center justify-center transition-all z-10"
+                    >
+                      <Icon name="close" className="text-base" />
+                    </button>
+                  )}
                   <div className="absolute inset-x-0 bottom-0 p-2 bg-gradient-to-t from-surface-dim/95 via-surface-dim/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex flex-col gap-1.5">
                     {p.persons.length > 0 && (
                       <div className="flex flex-wrap gap-1">
-                        {p.persons.slice(0, 5).map((pp) => (
+                        {p.persons.slice(0, 3).map((pp) => (
                           <button
                             key={pp.id}
                             onClick={(e) => {
@@ -177,9 +256,9 @@ export default function AllPhotosGrid({
                             <span className="truncate">{pp.name ?? `Person ${pp.id}`}</span>
                           </button>
                         ))}
-                        {p.persons.length > 5 && (
+                        {p.persons.length > 3 && (
                           <span className="flex items-center px-1.5 py-0.5 rounded-full bg-black/50 text-white text-[11px] font-medium">
-                            +{p.persons.length - 5}
+                            +{p.persons.length - 3}
                           </span>
                         )}
                       </div>

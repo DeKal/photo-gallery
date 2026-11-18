@@ -1,6 +1,18 @@
-import { useEffect, useState } from "react";
-import { imageSources, getPhotoPersons, type PhotoPerson } from "../api";
+import { useEffect, useRef, useState } from "react";
+import {
+  imageSources,
+  getPhotoPersons,
+  downloadPhoto,
+  getAlbums,
+  getPhotoAlbums,
+  createAlbum,
+  addPhotosToAlbum,
+  removePhotosFromAlbum,
+  type PhotoPerson,
+  type Album,
+} from "../api";
 import Icon from "./Icon";
+import AlbumDialog from "./AlbumDialog";
 
 interface Props {
   // Ordered list of photo ids the viewer can page through.
@@ -65,6 +77,77 @@ export default function Lightbox({ ids, index, onIndexChange, onClose, driveIds,
       alive = false;
     };
   }, [id]);
+
+  // Download + add-to-album actions. The album menu loads albums on open and is
+  // dismissed whenever the viewed photo changes; `note` is a transient toast.
+  // `memberIds` is which albums the current photo is already in, so the menu can
+  // show membership and toggle it (add vs remove) rather than only ever adding.
+  const [albumMenu, setAlbumMenu] = useState(false);
+  const [albums, setAlbums] = useState<Album[]>([]);
+  const [memberIds, setMemberIds] = useState<Set<number>>(new Set());
+  const [note, setNote] = useState<string | null>(null);
+  // Open state of the "new album" naming dialog (proper modal, not prompt).
+  const [newAlbumOpen, setNewAlbumOpen] = useState(false);
+  const noteTimer = useRef<number | null>(null);
+  useEffect(() => setAlbumMenu(false), [id]);
+  useEffect(() => () => {
+    if (noteTimer.current) window.clearTimeout(noteTimer.current);
+  }, []);
+
+  const flash = (msg: string) => {
+    setNote(msg);
+    if (noteTimer.current) window.clearTimeout(noteTimer.current);
+    noteTimer.current = window.setTimeout(() => setNote(null), 2000);
+  };
+
+  const toggleAlbumMenu = async () => {
+    const next = !albumMenu;
+    setAlbumMenu(next);
+    if (next) {
+      try {
+        const [all, mine] = await Promise.all([getAlbums(), getPhotoAlbums(id)]);
+        setAlbums(all);
+        setMemberIds(new Set(mine.map((a) => a.id)));
+      } catch {
+        setAlbums([]);
+        setMemberIds(new Set());
+      }
+    }
+  };
+
+  // Toggle membership: add if not in the album, remove if already in it.
+  const toggleMembership = async (album: Album) => {
+    const inIt = memberIds.has(album.id);
+    try {
+      if (inIt) {
+        await removePhotosFromAlbum(album.id, [id]);
+        setMemberIds((s) => {
+          const n = new Set(s);
+          n.delete(album.id);
+          return n;
+        });
+        flash(`Removed from ${album.name}`);
+      } else {
+        await addPhotosToAlbum(album.id, [id]);
+        setMemberIds((s) => new Set(s).add(album.id));
+        flash(`Added to ${album.name}`);
+      }
+    } catch {
+      flash("Could not update album");
+    }
+  };
+
+  const addToNew = async (name: string) => {
+    setNewAlbumOpen(false);
+    try {
+      const a = await createAlbum(name);
+      await addPhotosToAlbum(a.id, [id]);
+      setMemberIds((s) => new Set(s).add(a.id));
+      flash(`Added to ${a.name}`);
+    } catch {
+      flash("Could not create album");
+    }
+  };
 
   // Full-res photos are large, so the previous frame lingers while the next
   // one downloads. Show a thumbnail instantly + a spinner until the full image
@@ -169,15 +252,78 @@ export default function Lightbox({ ids, index, onIndexChange, onClose, driveIds,
           )}
         </div>
         <div className="mt-4 flex flex-col items-center gap-3">
-          {onOpenSimilar && (
+          <div className="flex flex-wrap items-center justify-center gap-2">
+            {onOpenSimilar && (
+              <button
+                data-testid="lightbox-action"
+                onClick={() => onOpenSimilar(id)}
+                className="px-space-lg py-2 rounded-full bg-gradient-to-r from-indigo-500 to-violet-600 hover:opacity-90 text-white font-label-md text-label-md shadow-lg shadow-indigo-500/30 active:scale-[0.98] transition-all flex items-center gap-2"
+              >
+                <Icon name="auto_awesome" className="text-base" />
+                More like this
+              </button>
+            )}
             <button
-              data-testid="lightbox-action"
-              onClick={() => onOpenSimilar(id)}
-              className="px-space-lg py-2 rounded-full bg-gradient-to-r from-indigo-500 to-violet-600 hover:opacity-90 text-white font-label-md text-label-md shadow-lg shadow-indigo-500/30 active:scale-[0.98] transition-all flex items-center gap-2"
+              data-testid="lightbox-download"
+              onClick={() => void downloadPhoto(id, driveId)}
+              title="Download photo"
+              className="px-space-lg py-2 rounded-full bg-[#171922]/90 border border-white/10 hover:border-white/30 text-on-surface hover:text-white font-label-md text-label-md active:scale-[0.98] transition-all flex items-center gap-2"
             >
-              <Icon name="auto_awesome" className="text-base" />
-              More like this
+              <Icon name="download" className="text-base" />
+              Download
             </button>
+            <div className="relative">
+              <button
+                data-testid="lightbox-add-album"
+                onClick={() => void toggleAlbumMenu()}
+                title="Add to album"
+                className="px-space-lg py-2 rounded-full bg-[#171922]/90 border border-white/10 hover:border-white/30 text-on-surface hover:text-white font-label-md text-label-md active:scale-[0.98] transition-all flex items-center gap-2"
+              >
+                <Icon name="bookmark_add" className="text-base" />
+                Add to album
+              </button>
+              {albumMenu && (
+                <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 w-56 max-h-72 overflow-y-auto custom-scroll rounded-xl bg-[#171922] border border-white/10 shadow-2xl py-1 z-10">
+                  <button
+                    onClick={() => {
+                      setAlbumMenu(false);
+                      setNewAlbumOpen(true);
+                    }}
+                    className="w-full flex items-center gap-2 px-3 py-2 text-label-md font-label-md text-primary hover:bg-white/5 transition-colors"
+                  >
+                    <Icon name="add" className="text-base" />
+                    New album…
+                  </button>
+                  {albums.length > 0 && <div className="my-1 h-px bg-white/10" />}
+                  {albums.map((a) => {
+                    const inIt = memberIds.has(a.id);
+                    return (
+                      <button
+                        key={a.id}
+                        onClick={() => void toggleMembership(a)}
+                        title={inIt ? `Remove from ${a.name}` : `Add to ${a.name}`}
+                        className="w-full flex items-center justify-between gap-2 px-3 py-2 text-label-md font-label-md text-on-surface hover:bg-white/5 transition-colors"
+                      >
+                        <span className="flex items-center gap-2 truncate">
+                          <Icon
+                            name={inIt ? "check_circle" : "collections_bookmark"}
+                            className={`text-base shrink-0 ${inIt ? "text-emerald-400" : "text-outline"}`}
+                          />
+                          <span className={`truncate ${inIt ? "text-white" : ""}`}>{a.name}</span>
+                        </span>
+                        <span className="text-outline text-label-sm shrink-0">{a.photo_count}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
+          {note && (
+            <div className="text-label-sm font-label-sm text-emerald-400 flex items-center gap-1.5">
+              <Icon name="check_circle" className="text-base" />
+              {note}
+            </div>
           )}
           {onOpenPerson && persons.length > 0 && (
             <div className="flex flex-wrap items-center justify-center gap-2 max-w-[90vw]">
@@ -197,6 +343,17 @@ export default function Lightbox({ ids, index, onIndexChange, onClose, driveIds,
           )}
         </div>
       </div>
+
+      {newAlbumOpen && (
+        <div onClick={(e) => e.stopPropagation()}>
+          <AlbumDialog
+            title="New album"
+            confirmLabel="Create & add"
+            onCancel={() => setNewAlbumOpen(false)}
+            onSubmit={(name) => void addToNew(name)}
+          />
+        </div>
+      )}
     </div>
   );
 }

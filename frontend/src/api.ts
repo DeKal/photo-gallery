@@ -135,12 +135,46 @@ export function imageSources(
     : [imageUrl(photoId)];
 }
 
+// Download the full-resolution photo to the user's disk. Tries each candidate
+// source in turn, fetching the bytes and saving them via a temporary <a>. Drive
+// (lh3.googleusercontent.com) may block cross-origin fetches with CORS; if every
+// source fails we open the first URL in a new tab so the user can save it
+// manually.
+export async function downloadPhoto(
+  photoId: number,
+  driveFileId?: string | null,
+): Promise<void> {
+  const srcs = imageSources(photoId, driveFileId);
+  for (const src of srcs) {
+    try {
+      const res = await fetch(src, { referrerPolicy: "no-referrer" });
+      if (!res.ok) continue;
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `photo-${photoId}.jpg`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      return;
+    } catch {
+      // Try the next source.
+    }
+  }
+  window.open(srcs[0], "_blank", "noopener");
+}
+
 // ---- Scan ----------------------------------------------------------------
 
-export function startScan(rootPath: string): Promise<{ scan_id: number }> {
+export function startScan(rootPath: string, albumName?: string): Promise<{ scan_id: number }> {
   return request("/scan", {
     method: "POST",
-    body: JSON.stringify({ root_path: rootPath }),
+    body: JSON.stringify({
+      root_path: rootPath,
+      ...(albumName && albumName.trim() ? { album_name: albumName.trim() } : {}),
+    }),
   });
 }
 
@@ -158,8 +192,14 @@ export function cluster(): Promise<ClusterResult> {
 
 // ---- Persons -------------------------------------------------------------
 
-export function getPersons(includeHidden = false): Promise<Person[]> {
-  return request(`/persons${includeHidden ? "?include_hidden=true" : ""}`);
+// Persons, similarity and their photos/faces can be scoped to a single album
+// (the album-detail view). Omit the album arg for the global library views.
+export function getPersons(includeHidden = false, album?: number): Promise<Person[]> {
+  const qs = new URLSearchParams();
+  if (includeHidden) qs.set("include_hidden", "true");
+  if (album != null) qs.set("album", String(album));
+  const s = qs.toString();
+  return request(`/persons${s ? `?${s}` : ""}`);
 }
 
 export function hidePerson(id: number): Promise<Person> {
@@ -170,16 +210,44 @@ export function unhidePerson(id: number): Promise<Person> {
   return request(`/persons/${id}/unhide`, { method: "POST" });
 }
 
-export function getPerson(id: number): Promise<Person> {
-  return request(`/persons/${id}`);
+export function getPerson(id: number, album?: number): Promise<Person> {
+  return request(`/persons/${id}${album != null ? `?album=${album}` : ""}`);
 }
 
-export function getPersonPhotos(id: number): Promise<Photo[]> {
-  return request(`/persons/${id}/photos`);
+export function getPersonPhotos(id: number, album?: number): Promise<Photo[]> {
+  return request(`/persons/${id}/photos${album != null ? `?album=${album}` : ""}`);
 }
 
-export function getPersonFaces(id: number): Promise<Face[]> {
-  return request(`/persons/${id}/faces`);
+export function getPersonFaces(id: number, album?: number): Promise<Face[]> {
+  return request(`/persons/${id}/faces${album != null ? `?album=${album}` : ""}`);
+}
+
+// Download a single face crop (the person's current cover face) to disk.
+// The crop is served same-origin via the gateway, so the fetch→blob save works.
+export async function downloadFaceCrop(
+  faceId: number,
+  name?: string | null,
+): Promise<void> {
+  const src = faceThumbUrl(faceId);
+  const safe = (name || `face-${faceId}`).replace(/[^a-zA-Z0-9-_]/g, "_");
+  try {
+    const res = await fetch(src, { referrerPolicy: "no-referrer" });
+    if (res.ok) {
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${safe}-face.jpg`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+      return;
+    }
+  } catch {
+    // Fall through to opening the crop in a new tab.
+  }
+  window.open(src, "_blank", "noopener");
 }
 
 export function setPersonCover(id: number, faceId: number): Promise<Person> {
@@ -215,16 +283,17 @@ export function moveFaces(
 
 // ---- Similarity ----------------------------------------------------------
 
-export function getSimClusters(): Promise<SimCluster[]> {
-  return request("/sim-clusters");
+export function getSimClusters(album?: number): Promise<SimCluster[]> {
+  return request(`/sim-clusters${album != null ? `?album=${album}` : ""}`);
 }
 
-export function getSimClusterPhotos(id: number): Promise<Photo[]> {
-  return request(`/sim-clusters/${id}/photos`);
+export function getSimClusterPhotos(id: number, album?: number): Promise<Photo[]> {
+  return request(`/sim-clusters/${id}/photos${album != null ? `?album=${album}` : ""}`);
 }
 
-export function getSimilar(photoId: number, k = 50): Promise<SimilarPhoto[]> {
-  return request(`/photos/${photoId}/similar?k=${k}`);
+export function getSimilar(photoId: number, k = 50, album?: number): Promise<SimilarPhoto[]> {
+  const al = album != null ? `&album=${album}` : "";
+  return request(`/photos/${photoId}/similar?k=${k}${al}`);
 }
 
 // ---- All Photos (flat library) ------------------------------------------
@@ -263,7 +332,54 @@ export function getPhotos(
   offset = 0,
   order: PhotoOrder = "newest",
   q = "",
+  album?: number,
 ): Promise<PhotoListPage> {
   const qs = q.trim() ? `&q=${encodeURIComponent(q.trim())}` : "";
-  return request(`/photos?limit=${limit}&offset=${offset}&order=${order}${qs}`);
+  const al = album != null ? `&album=${album}` : "";
+  return request(`/photos?limit=${limit}&offset=${offset}&order=${order}${qs}${al}`);
+}
+
+// ---- Albums --------------------------------------------------------------
+
+export interface Album {
+  id: number;
+  name: string;
+  photo_count: number;
+  cover_photo_id: number | null;
+  cover_drive_file_id?: string | null;
+}
+
+export function getAlbums(): Promise<Album[]> {
+  return request("/albums");
+}
+
+// Albums a single photo currently belongs to (for membership toggles).
+export function getPhotoAlbums(photoId: number): Promise<Album[]> {
+  return request(`/photos/${photoId}/albums`);
+}
+
+export function createAlbum(name: string): Promise<Album> {
+  return request("/albums", { method: "POST", body: JSON.stringify({ name }) });
+}
+
+export function renameAlbum(id: number, name: string): Promise<Album> {
+  return request(`/albums/${id}`, { method: "PATCH", body: JSON.stringify({ name }) });
+}
+
+export function deleteAlbum(id: number): Promise<{ deleted: boolean }> {
+  return request(`/albums/${id}`, { method: "DELETE" });
+}
+
+export function addPhotosToAlbum(id: number, photoIds: number[]): Promise<Album> {
+  return request(`/albums/${id}/photos`, {
+    method: "POST",
+    body: JSON.stringify({ photo_ids: photoIds }),
+  });
+}
+
+export function removePhotosFromAlbum(id: number, photoIds: number[]): Promise<Album> {
+  return request(`/albums/${id}/photos`, {
+    method: "DELETE",
+    body: JSON.stringify({ photo_ids: photoIds }),
+  });
 }

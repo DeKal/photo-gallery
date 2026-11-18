@@ -3,8 +3,10 @@ import {
   getSimClusters,
   getSimClusterPhotos,
   getSimilar,
+  getAlbums,
   thumbUrl,
   thumbSources,
+  type Album,
   type SimCluster,
   type Photo,
   type SimilarPhoto,
@@ -87,10 +89,13 @@ type View =
 
 export default function SimilarGrid({
   focus = null,
+  album,
   onOpenPerson,
   onOpenSimilar,
 }: {
   focus?: { photoId: number; n: number } | null;
+  // When set, clusters/similarity are scoped to this album.
+  album?: number;
   onOpenPerson?: (id: number) => void;
   onOpenSimilar?: (id: number) => void;
 }) {
@@ -100,17 +105,29 @@ export default function SimilarGrid({
   const [view, setView] = useState<View>({ kind: "clusters" });
   const [lightbox, setLightbox] = useState<{ ids: number[]; index: number; driveIds: Record<number, string | null> } | null>(null);
   const [query, setQuery] = useState("");
+  // Top-level Similar can be narrowed to one album; when embedded in album-detail
+  // the `album` prop pins it and this picker is hidden.
+  const [albums, setAlbums] = useState<Album[]>([]);
+  const [albumFilter, setAlbumFilter] = useState<number | null>(null);
+  const effectiveAlbum = album ?? albumFilter ?? undefined;
+
+  useEffect(() => {
+    if (album != null) return;
+    getAlbums()
+      .then(setAlbums)
+      .catch(() => setAlbums([]));
+  }, [album]);
 
   useEffect(() => {
     setLoading(true);
-    getSimClusters()
+    getSimClusters(effectiveAlbum)
       .then((c) => {
         setClusters(c);
         setError(null);
       })
       .catch((e) => setError(e instanceof Error ? e.message : String(e)))
       .finally(() => setLoading(false));
-  }, []);
+  }, [effectiveAlbum]);
 
   // "More like this" requested from another view → jump straight to the
   // visual-similarity results for that photo.
@@ -150,6 +167,7 @@ export default function SimilarGrid({
       <section className={SECTION}>
         <ClusterPhotos
           cluster={view.cluster}
+          album={effectiveAlbum}
           onBack={() => setView({ kind: "clusters" })}
           onOpen={(ids, index, driveIds) => setLightbox({ ids, index, driveIds })}
         />
@@ -163,6 +181,7 @@ export default function SimilarGrid({
       <section className={SECTION}>
         <SimilarPanel
           photoId={view.photoId}
+          album={effectiveAlbum}
           onBack={() => (view.from ? setView({ kind: "cluster", cluster: view.from }) : setView({ kind: "clusters" }))}
           onOpen={(ids, index, driveIds) => setLightbox({ ids, index, driveIds })}
         />
@@ -186,21 +205,40 @@ export default function SimilarGrid({
         <span className="font-body-md text-body-md text-on-surface-variant font-medium">
           {q ? `${visible.length} of ${clusters.length}` : clusters.length} similar {clusters.length === 1 ? "set" : "sets"}
         </span>
-        <div className="flex items-center bg-surface-container border border-outline-variant/60 rounded-xl px-3 h-11 focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20 transition-all">
-          <Icon name="search" className="text-outline text-base mr-1.5" />
-          <input
-            type="text"
-            data-testid="sim-search"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Filter sets by person name…"
-            className="w-44 sm:w-56 bg-transparent text-on-surface text-body-sm font-body-sm outline-none border-none p-0 focus:ring-0 placeholder:text-outline"
-          />
-          {query && (
-            <button className="ml-1 text-outline hover:text-on-surface" title="Clear filter" onClick={() => setQuery("")}>
-              <Icon name="close" className="text-sm" />
-            </button>
+        <div className="flex items-center gap-space-sm">
+          {album == null && (
+            <div className="relative">
+              <Icon name="collections_bookmark" className="text-[16px] text-outline absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <select
+                data-testid="sim-album-filter"
+                value={albumFilter ?? ""}
+                onChange={(e) => setAlbumFilter(e.target.value ? Number(e.target.value) : null)}
+                className="h-11 pl-9 pr-8 appearance-none rounded-xl bg-surface-container border border-outline-variant/60 text-on-surface text-body-sm font-body-sm hover:border-outline-variant focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all cursor-pointer"
+              >
+                <option value="">All albums</option>
+                {albums.map((a) => (
+                  <option key={a.id} value={a.id}>{a.name}</option>
+                ))}
+              </select>
+              <Icon name="expand_more" className="text-[16px] text-outline absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+            </div>
           )}
+          <div className="flex items-center bg-surface-container border border-outline-variant/60 rounded-xl px-3 h-11 focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20 transition-all">
+            <Icon name="search" className="text-outline text-base mr-1.5" />
+            <input
+              type="text"
+              data-testid="sim-search"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Filter sets by person name…"
+              className="w-44 sm:w-56 bg-transparent text-on-surface text-body-sm font-body-sm outline-none border-none p-0 focus:ring-0 placeholder:text-outline"
+            />
+            {query && (
+              <button className="ml-1 text-outline hover:text-on-surface" title="Clear filter" onClick={() => setQuery("")}>
+                <Icon name="close" className="text-sm" />
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -282,10 +320,12 @@ export default function SimilarGrid({
 
 function ClusterPhotos({
   cluster,
+  album,
   onBack,
   onOpen,
 }: {
   cluster: SimCluster;
+  album?: number;
   onBack: () => void;
   onOpen: (ids: number[], index: number, driveIds: Record<number, string | null>) => void;
 }) {
@@ -295,14 +335,14 @@ function ClusterPhotos({
 
   useEffect(() => {
     setLoading(true);
-    getSimClusterPhotos(cluster.id)
+    getSimClusterPhotos(cluster.id, album)
       .then((p) => {
         setPhotos(p);
         setError(null);
       })
       .catch((e) => setError(e instanceof Error ? e.message : String(e)))
       .finally(() => setLoading(false));
-  }, [cluster.id]);
+  }, [cluster.id, album]);
 
   return (
     <div>
@@ -337,10 +377,12 @@ function ClusterPhotos({
 
 function SimilarPanel({
   photoId,
+  album,
   onBack,
   onOpen,
 }: {
   photoId: number;
+  album?: number;
   onBack: () => void;
   onOpen: (ids: number[], index: number, driveIds: Record<number, string | null>) => void;
 }) {
@@ -350,14 +392,14 @@ function SimilarPanel({
 
   useEffect(() => {
     setLoading(true);
-    getSimilar(photoId, 50)
+    getSimilar(photoId, 50, album)
       .then((r) => {
         setResults([...r].sort((a, b) => a.distance - b.distance));
         setError(null);
       })
       .catch((e) => setError(e instanceof Error ? e.message : String(e)))
       .finally(() => setLoading(false));
-  }, [photoId]);
+  }, [photoId, album]);
 
   return (
     <div>

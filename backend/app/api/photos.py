@@ -10,7 +10,7 @@ from sqlalchemy import and_, func, or_, select
 from sqlalchemy.orm import Session
 
 from app.db import get_session
-from app.models import Face, FacePerson, Person, Photo
+from app.models import Face, FacePerson, Person, Photo, PhotoAlbum
 from app.schemas import PhotoListItem, PhotoListOut, PhotoPerson
 
 router = APIRouter()
@@ -24,6 +24,7 @@ def list_photos(
     offset: int = Query(default=0, ge=0),
     order: str = Query(default="newest", pattern="^(newest|oldest)$"),
     q: str | None = Query(default=None),
+    album: int | None = Query(default=None),
     session: Session = Depends(get_session),
 ) -> PhotoListOut:
     """A page of successfully-indexed photos plus the total count.
@@ -35,9 +36,20 @@ def list_photos(
     in a photo and link straight to each person for cross-checking.
 
     ``q`` filters the whole library by file path **or** the name of any person
-    present in the photo (case-insensitive substring).
+    present in the photo (case-insensitive substring). ``album`` restricts the
+    listing to photos belonging to that album.
     """
     conds = [Photo.error.is_(None)]
+    if album is not None:
+        conds.append(
+            select(PhotoAlbum.photo_id)
+            .where(
+                PhotoAlbum.photo_id == Photo.id,
+                PhotoAlbum.album_id == album,
+            )
+            .correlate(Photo)
+            .exists()
+        )
     if q and q.strip():
         like = f"%{q.strip()}%"
         person_match = (

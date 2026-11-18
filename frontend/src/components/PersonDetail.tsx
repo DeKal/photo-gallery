@@ -3,6 +3,7 @@ import {
   getPerson,
   getPersonPhotos,
   getPersonFaces,
+  downloadFaceCrop,
   setPersonCover,
   renamePerson,
   faceThumbUrl,
@@ -17,6 +18,8 @@ import Icon from "./Icon";
 
 interface Props {
   personId: number;
+  // When set, photos/faces/counts are scoped to this album.
+  album?: number;
   onBack: () => void;
   onChanged: () => void;
   onOpenPerson?: (id: number) => void;
@@ -54,7 +57,7 @@ const photoPlaceholder = (
 // real person data (rename, cover-face picker, photo lightbox). Decorative
 // controls from the mock (Export Face Crops, Filter by Date, search, sort,
 // density, meta tags) are shown inert to match the layout.
-export default function PersonDetail({ personId, onBack, onChanged, onOpenPerson, onOpenSimilar }: Props) {
+export default function PersonDetail({ personId, album, onBack, onChanged, onOpenPerson, onOpenSimilar }: Props) {
   const [person, setPerson] = useState<Person | null>(null);
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [faces, setFaces] = useState<Face[]>([]);
@@ -65,10 +68,27 @@ export default function PersonDetail({ personId, onBack, onChanged, onOpenPerson
   const [settingCover, setSettingCover] = useState(false);
   const [showAllFaces, setShowAllFaces] = useState(false);
   const [lightbox, setLightbox] = useState<number | null>(null);
+  const [exporting, setExporting] = useState(false);
+
+  // Download the person's current cover face crop. Falls back to the best
+  // member face if no cover is set yet.
+  async function downloadCurrentFace() {
+    if (exporting) return;
+    const faceId = person?.cover_face_id ?? faces[0]?.id ?? null;
+    if (faceId == null) return;
+    setExporting(true);
+    try {
+      await downloadFaceCrop(faceId, person?.name ?? null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setExporting(false);
+    }
+  }
 
   useEffect(() => {
     setLoading(true);
-    Promise.all([getPerson(personId), getPersonPhotos(personId), getPersonFaces(personId)])
+    Promise.all([getPerson(personId, album), getPersonPhotos(personId, album), getPersonFaces(personId, album)])
       .then(([p, ph, fc]) => {
         setPerson(p);
         setPhotos(ph);
@@ -78,7 +98,7 @@ export default function PersonDetail({ personId, onBack, onChanged, onOpenPerson
       })
       .catch((e) => setError(e instanceof Error ? e.message : String(e)))
       .finally(() => setLoading(false));
-  }, [personId]);
+  }, [personId, album]);
 
   async function save() {
     if (!name.trim()) return;
@@ -125,10 +145,16 @@ export default function PersonDetail({ personId, onBack, onChanged, onOpenPerson
             <span>Back to People</span>
           </button>
           <div className="flex items-center gap-space-sm">
-            <span className="px-space-md py-1.5 rounded-xl border border-outline-variant bg-surface-container text-on-surface-variant text-label-md font-label-md flex items-center gap-space-xs opacity-60 cursor-default">
-              <Icon name="crop" className="text-[18px]" />
-              <span className="hidden sm:inline">Export Face Crops</span>
-            </span>
+            <button
+              data-testid="export-faces-btn"
+              onClick={() => void downloadCurrentFace()}
+              disabled={exporting || loading || !person || (person.cover_face_id == null && faces.length === 0)}
+              title="Download the current cover face crop"
+              className="px-space-md py-1.5 rounded-xl border border-outline-variant bg-surface-container text-on-surface-variant hover:text-on-surface hover:border-outline text-label-md font-label-md flex items-center gap-space-xs transition-colors disabled:opacity-45 disabled:cursor-not-allowed"
+            >
+              <Icon name={exporting ? "progress_activity" : "download"} className={`text-[18px] ${exporting ? "animate-spin" : ""}`} />
+              <span className="hidden sm:inline">{exporting ? "Downloading…" : "Download Face"}</span>
+            </button>
             <span className="p-1.5 rounded-xl border border-outline-variant bg-surface-container text-on-surface-variant opacity-60 cursor-default">
               <Icon name="more_vert" className="text-[18px]" />
             </span>

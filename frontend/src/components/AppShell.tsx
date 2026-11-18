@@ -1,13 +1,14 @@
 import type { ReactNode } from "react";
 import Icon from "./Icon";
 
-export type NavKey = "all" | "people" | "similar" | "hidden";
+export type NavKey = "all" | "people" | "similar" | "hidden" | "albums";
 
 export interface Counts {
   all: number | null;
   people: number | null;
   similar: number | null;
   hidden: number | null;
+  albums: number | null;
 }
 
 interface Props {
@@ -22,6 +23,7 @@ const NAV: { key: NavKey; label: string; icon: string }[] = [
   { key: "all", label: "All Photos", icon: "photo_library" },
   { key: "people", label: "Faces & People", icon: "group" },
   { key: "similar", label: "Similar Sets", icon: "burst_mode" },
+  { key: "albums", label: "Albums", icon: "collections_bookmark" },
 ];
 
 // Verbatim port of the Stitch "PhotoCluster — People View" code.html shared

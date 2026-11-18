@@ -21,6 +21,8 @@ export default function ScanBar({ onClustered, path, onPathChange }: Props) {
   const [scan, setScan] = useState<Scan | null>(null);
   const [phase, setPhase] = useState<Phase>("idle");
   const [error, setError] = useState<string | null>(null);
+  // Optional album to ingest the scanned folder into (created on demand).
+  const [albumName, setAlbumName] = useState("");
   const pollRef = useRef<number | null>(null);
 
   useEffect(() => {
@@ -98,7 +100,7 @@ export default function ScanBar({ onClustered, path, onPathChange }: Props) {
     setScan(null);
     setPhase("scanning");
     try {
-      const { scan_id } = await startScan(path.trim());
+      const { scan_id } = await startScan(path.trim(), albumName.trim() || undefined);
       localStorage.setItem(STORAGE_KEY, String(scan_id));
       poll(scan_id);
     } catch (e) {
@@ -149,6 +151,18 @@ export default function ScanBar({ onClustered, path, onPathChange }: Props) {
           )}
         </div>
         <div className="flex items-center gap-space-sm">
+          <div className="flex items-center bg-[#171922] border border-[#232736] rounded-xl px-3 py-2 shadow-inner focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-500/20 transition-all">
+            <Icon name="collections_bookmark" className="text-outline mr-2 text-[18px]" />
+            <input
+              type="text"
+              data-testid="scan-album-input"
+              className="w-40 bg-transparent text-on-surface text-body-sm font-body-sm outline-none border-none p-0 focus:ring-0 placeholder:text-outline"
+              placeholder="Add to album…"
+              value={albumName}
+              onChange={(e) => setAlbumName(e.target.value)}
+              disabled={busy}
+            />
+          </div>
           <button
             data-testid="browse-btn"
             onClick={() => void onBrowse()}

@@ -1,8 +1,12 @@
 """Backfill ``Photo.taken_at`` for rows that are missing it.
 
-Older scans never populated ``taken_at``. This fills each null row using the
-image's EXIF capture time, falling back to the file's last-modified time (see
-``scanner.file_taken_at``). Photos whose original file is missing are skipped.
+Older scans never populated ``taken_at``. This fills each null row with the best
+available date so nothing stays "Undated":
+
+    EXIF capture time  ->  file mtime  ->  scanned_at  ->  now
+
+The first two come from ``scanner.file_taken_at`` when the original file is still
+on disk; otherwise the row's scan time is used, and finally the current time.
 
 Run from the backend dir with the project venv (it needs filesystem access to
 the originals, so run on the host where the worker runs)::
@@ -15,6 +19,7 @@ the originals, so run on the host where the worker runs)::
 from __future__ import annotations
 
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 
 # Make ``app`` importable when run as a script from the backend dir.
@@ -27,8 +32,8 @@ from app.scanner import file_taken_at  # noqa: E402
 
 def main() -> int:
     session = SessionLocal()
-    filled = 0
-    skipped: list[tuple[int, str]] = []
+    now = datetime.now(timezone.utc)
+    from_file = from_scan = from_now = 0
     try:
         photos = (
             session.query(Photo)
@@ -40,33 +45,33 @@ def main() -> int:
         print(f"Found {total} photo(s) with no taken_at.")
 
         for i, photo in enumerate(photos, start=1):
-            if not photo.path or not Path(photo.path).is_file():
-                skipped.append((photo.id, f"missing file: {photo.path}"))
-                continue
-
-            dt = file_taken_at(photo.path)
-            if dt is None:
-                skipped.append((photo.id, "no exif/mtime"))
-                continue
+            dt = None
+            if photo.path and Path(photo.path).is_file():
+                dt = file_taken_at(photo.path)
+            if dt is not None:
+                from_file += 1
+            elif photo.scanned_at is not None:
+                dt = photo.scanned_at
+                from_scan += 1
+            else:
+                dt = now
+                from_now += 1
 
             photo.taken_at = dt
-            filled += 1
 
             if i % 100 == 0:
                 session.commit()
-                print(f"  {i}/{total} processed ({filled} filled)...")
+                print(f"  {i}/{total} processed...")
 
         session.commit()
     finally:
         session.close()
 
-    print(f"\nDone. Filled {filled} row(s); {len(skipped)} skipped.")
-    if skipped:
-        print("Skipped (photo_id: reason):")
-        for photo_id, reason in skipped[:50]:
-            print(f"  {photo_id}: {reason}")
-        if len(skipped) > 50:
-            print(f"  ... and {len(skipped) - 50} more")
+    filled = from_file + from_scan + from_now
+    print(
+        f"\nDone. Filled {filled} row(s): "
+        f"from file={from_file}, from scan date={from_scan}, from now={from_now}."
+    )
     return 0
 
 

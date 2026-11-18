@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { getPersons, mergePersons, hidePerson, unhidePerson, faceThumbUrl, thumbUrl, type Person } from "../api";
+import { getPersons, getAlbums, mergePersons, hidePerson, unhidePerson, faceThumbUrl, thumbUrl, type Album, type Person } from "../api";
 import ImgWithFallback from "./ImgWithFallback";
 import PersonDetail from "./PersonDetail";
 import Icon from "./Icon";
@@ -16,6 +16,8 @@ const personPlaceholder = (
 interface Props {
   initialShowHidden?: boolean;
   hiddenOnly?: boolean;
+  // When set, People are scoped to this album (counts/covers reflect it).
+  album?: number;
   // Auto-open this person (focused from another view). Nonce re-triggers.
   focus?: { id: number; n: number } | null;
   // Cross-view handlers passed through to the photo viewer.
@@ -26,6 +28,7 @@ interface Props {
 export default function PeopleGrid({
   initialShowHidden = false,
   hiddenOnly = false,
+  album,
   focus = null,
   onOpenPerson,
   onOpenSimilar,
@@ -42,8 +45,20 @@ export default function PeopleGrid({
   const [busy, setBusy] = useState<Set<number>>(new Set());
   const [density, setDensity] = useState<"comfortable" | "compact">("comfortable");
   const [query, setQuery] = useState("");
+  // Top-level People can be narrowed to one album; when embedded in album-detail
+  // the `album` prop pins it and this picker is hidden.
+  const [albums, setAlbums] = useState<Album[]>([]);
+  const [albumFilter, setAlbumFilter] = useState<number | null>(null);
+  const effectiveAlbum = album ?? albumFilter ?? undefined;
   // Remember the gallery scroll position so returning from a person restores it.
   const scrollPos = useRef(0);
+
+  useEffect(() => {
+    if (album != null) return;
+    getAlbums()
+      .then(setAlbums)
+      .catch(() => setAlbums([]));
+  }, [album]);
 
   const scroller = () => document.querySelector<HTMLElement>("main.custom-scroll");
 
@@ -62,7 +77,7 @@ export default function PeopleGrid({
 
   const load = useCallback(() => {
     setLoading(true);
-    getPersons(hiddenOnly ? true : showHidden)
+    getPersons(hiddenOnly ? true : showHidden, effectiveAlbum)
       .then((p) => {
         const list = hiddenOnly ? p.filter((x) => x.hidden) : p;
         // Named people first (stable — keeps the existing face-count order within each group).
@@ -71,7 +86,7 @@ export default function PeopleGrid({
       })
       .catch((e) => setError(e instanceof Error ? e.message : String(e)))
       .finally(() => setLoading(false));
-  }, [showHidden, hiddenOnly]);
+  }, [showHidden, hiddenOnly, effectiveAlbum]);
 
   useEffect(() => {
     load();
@@ -133,6 +148,7 @@ export default function PeopleGrid({
     return (
       <PersonDetail
         personId={openId}
+        album={effectiveAlbum}
         onBack={() => setOpenId(null)}
         onChanged={load}
         onOpenPerson={onOpenPerson}
@@ -181,6 +197,23 @@ export default function PeopleGrid({
         </div>
 
         <div className="flex items-center gap-space-sm">
+          {album == null && (
+            <div className="relative">
+              <Icon name="collections_bookmark" className="text-[16px] text-outline absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <select
+                data-testid="people-album-filter"
+                value={albumFilter ?? ""}
+                onChange={(e) => setAlbumFilter(e.target.value ? Number(e.target.value) : null)}
+                className="h-9 pl-9 pr-8 appearance-none rounded-xl bg-[#171922] border border-[#232736] text-on-surface text-label-md font-label-md hover:border-outline-variant focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all cursor-pointer"
+              >
+                <option value="">All albums</option>
+                {albums.map((a) => (
+                  <option key={a.id} value={a.id}>{a.name}</option>
+                ))}
+              </select>
+              <Icon name="expand_more" className="text-[16px] text-outline absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+            </div>
+          )}
           <div className="flex items-center bg-[#171922] border border-[#232736] rounded-xl px-3 h-9 focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-500/20 transition-all">
             <Icon name="search" className="text-outline text-base mr-1.5" />
             <input

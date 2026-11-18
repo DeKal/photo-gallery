@@ -45,6 +45,8 @@ erDiagram
     face_person }o--|| persons : "belongs to"
     photos ||--o| photo_sim_cluster : "grouped"
     photo_sim_cluster }o--|| sim_clusters : "into"
+    photos ||--o{ photo_album : "in"
+    photo_album }o--|| albums : "collects"
 
     photos {
         int id PK
@@ -93,6 +95,16 @@ erDiagram
         text status
         int done
         int total
+        int album_id FK
+    }
+    albums {
+        int id PK
+        text name
+        timestamp created_at
+    }
+    photo_album {
+        int photo_id PK "FK to photos"
+        int album_id PK "FK to albums"
     }
 ```
 
@@ -109,6 +121,12 @@ Key points:
   display the full-resolution image straight from Drive.
 - **`persons.locked`** marks a curated person; locked persons are preserved
   verbatim across re-clustering instead of being rebuilt.
+- **`albums`** are user-named collections; `photo_album` is a many-to-many join,
+  so a photo can sit in several albums. A scan may carry an `album_id`, in which
+  case every photo it touches (new or already-indexed) is added to that album —
+  "scan this folder straight into *Wedding*". Album create/rename/delete and
+  manual add/remove are plain DB writes, so they work in the no-worker viewer
+  too.
 
 ## Data flow
 

@@ -27,7 +27,9 @@ def start_scan(
     """Create a scan for ``root_path`` and run the pipeline in the background.
 
     ``root_path`` is either a local directory or a public Google Drive folder
-    URL; Drive folders are downloaded locally first by the pipeline.
+    URL; Drive folders are downloaded locally first by the pipeline. When
+    ``album_name`` is given, every photo the scan touches is added to that
+    album (created on demand).
     """
     root = body.root_path.strip()
     if not is_drive_url(root) and not os.path.isdir(root):
@@ -36,7 +38,17 @@ def start_scan(
             detail="root_path is not a directory or a Google Drive folder URL",
         )
 
-    scan = Scan(root_path=root, status="pending", done=0, total=0)
+    album_id: int | None = None
+    if body.album_name and body.album_name.strip():
+        # Imported lazily: the slim API never scans, so the pipeline-side helper
+        # lives with the albums router rather than being a scan dependency.
+        from app.api.albums import get_or_create_album
+
+        album_id = get_or_create_album(session, body.album_name).id
+
+    scan = Scan(
+        root_path=root, status="pending", done=0, total=0, album_id=album_id
+    )
     session.add(scan)
     session.commit()
     session.refresh(scan)

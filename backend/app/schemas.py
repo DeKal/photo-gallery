@@ -12,6 +12,9 @@ class ScanRequest(BaseModel):
     """Request body for ``POST /scan``."""
 
     root_path: str
+    # When set, every photo the scan touches (new or already-indexed) is added
+    # to the album with this name (created if it does not exist yet).
+    album_name: Optional[str] = None
 
 
 class ScanStatus(BaseModel):
@@ -138,3 +141,25 @@ class MoveFacesRequest(BaseModel):
 
     face_ids: list[int]
     person_id: Optional[int] = None
+
+
+class AlbumOut(BaseModel):
+    """An album with its photo count and a cover photo for the card."""
+
+    id: int
+    name: str
+    photo_count: int = 0
+    cover_photo_id: Optional[int] = None
+    cover_drive_file_id: Optional[str] = None
+
+
+class AlbumCreate(BaseModel):
+    """Request body for ``POST /albums`` and ``PATCH /albums/{id}``."""
+
+    name: str
+
+
+class AlbumPhotosRequest(BaseModel):
+    """Request body for adding/removing photos from an album."""
+
+    photo_ids: list[int]
