@@ -50,7 +50,9 @@ export default function PeopleGrid({
 }: Props) {
   const navigate = useNavigate();
   const params = useParams();
-  const routedPersonId = routed && params.personId ? Number(params.personId) : null;
+  // One splat route (/people/*) backs both the grid and a person, so navigating
+  // between them never remounts this component — the loaded pages just stay.
+  const routedPersonId = routed && params["*"] ? Number(params["*"]) : null;
 
   // Select/merge + hide are shown only on desktop and only when not read-only.
   const canCurate = useIsDesktop() && !READONLY;
@@ -128,11 +130,17 @@ export default function PeopleGrid({
     [showHidden, hiddenOnly, effectiveAlbum],
   );
 
-  // Reload from the first page — used after merge/hide and when filters change.
+  // Reload from the first page — used after merge/hide (cluster set changes).
   const reload = useCallback(() => {
     setPersons([]);
     loadPage(0, debounced, true);
   }, [loadPage, debounced]);
+
+  // Rename / cover change in the detail view only touches one person — patch it
+  // in place so returning doesn't refetch and lose the loaded pages.
+  const patchPerson = useCallback((updated: Person) => {
+    setPersons((prev) => prev.map((p) => (p.id === updated.id ? { ...p, ...updated } : p)));
+  }, []);
 
   // Debounce the name filter so each keystroke doesn't hit the API.
   useEffect(() => {
@@ -223,7 +231,7 @@ export default function PeopleGrid({
         personId={openId}
         album={effectiveAlbum}
         onBack={closePerson}
-        onChanged={reload}
+        onChanged={patchPerson}
         onOpenPerson={onOpenPerson}
         onOpenSimilar={onOpenSimilar}
       />

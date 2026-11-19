@@ -24,7 +24,7 @@ interface Props {
   // When set, photos/faces/counts are scoped to this album.
   album?: number;
   onBack: () => void;
-  onChanged: () => void;
+  onChanged: (updated: Person) => void;
   onOpenPerson?: (id: number) => void;
   onOpenSimilar?: (id: number) => void;
 }
@@ -151,8 +151,9 @@ export default function PersonDetail({ personId, album, onBack, onChanged, onOpe
     setSaving(true);
     try {
       await renamePerson(personId, name.trim());
-      setPerson((p) => (p ? { ...p, name: name.trim() } : p));
-      onChanged();
+      const updated = person ? { ...person, name: name.trim() } : null;
+      setPerson(updated);
+      if (updated) onChanged(updated);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -167,7 +168,7 @@ export default function PersonDetail({ personId, album, onBack, onChanged, onOpe
       const updated = await setPersonCover(personId, faceId);
       setPerson(updated);
       setFaces((prev) => prev.map((f) => ({ ...f, is_cover: f.id === faceId })));
-      onChanged();
+      onChanged(updated);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
