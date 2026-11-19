@@ -188,16 +188,6 @@ export default function PersonDetail({ personId, album, onBack, onChanged, onOpe
 
                 {/* Detail block */}
                 <div className="flex-1 space-y-space-md min-w-0">
-                  <div className="flex flex-wrap items-center gap-space-xs">
-                    <span className="px-space-sm py-0.5 rounded-full text-label-sm font-label-sm bg-primary/10 border border-primary/25 text-primary flex items-center gap-1">
-                      <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
-                      {person.name ? "Identified Subject" : "Unidentified Subject"}
-                    </span>
-                    <span className="px-space-sm py-0.5 rounded-full text-label-sm font-label-sm bg-surface-container-high border border-outline-variant text-outline font-mono">
-                      Cluster #{person.id}
-                    </span>
-                  </div>
-
                   <div>
                     <h1 className="text-headline-md font-headline-lg font-bold text-white tracking-tight">{displayName}</h1>
                     <p className="text-body-sm font-body-sm text-outline mt-1">
