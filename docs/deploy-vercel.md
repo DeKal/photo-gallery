@@ -54,10 +54,19 @@ psql "$NEON_DIRECT_URL" -c "SELECT
 ## 3. Import the project into Vercel
 
 1. In Vercel, **Add New → Project** and import the repository.
-2. Leave the build settings at their defaults — `vercel.json` at the repo root
-   already sets the build command (`npm --prefix frontend ...`), the output
-   directory (`frontend/dist`), and the `/api/*` → serverless-function rewrite.
-   Vercel auto-detects the Python function in `api/`.
+2. Leave the build settings at their defaults. The root `vercel.json` uses the
+   **services** model and declares everything Vercel needs:
+   - a `backend` service (`root: backend`, `framework: fastapi`, entrypoint
+     `app.vercel_app:app`) — the DB-only API plus the SPA-shell / per-album
+     social-preview routes;
+   - a `frontend` service (`root: frontend`, `framework: vite`) — the static SPA;
+   - `rewrites` that send static assets (`/assets/*`, `/icon.png`, `/og-image.png`,
+     `/favicon.ico`, `/index.html`) to the frontend, and `/api/*` **plus every
+     other path** to the backend (the backend serves the SPA shell for deep links,
+     so a reload of `/all` or `/albums/12` resolves).
+
+   Per-service nested `vercel.json` files are ignored under the services model —
+   all config lives in the root file.
 
 ## 4. Set environment variables
 
@@ -69,13 +78,13 @@ In the Vercel project: **Settings → Environment Variables**. Add these for the
 | `PHOTO_DATABASE_URL` | Neon **pooled** connection string | Must be the `-pooler` host, `?sslmode=require`. Runtime DB connection. |
 | `VITE_NO_WORKER` | `1` | Build-time flag that hides the scan/import UI. Must be set **before** the build. |
 
-`PHOTO_SERVERLESS` does not need to be set — `api/index.py` forces it on so the
+`PHOTO_SERVERLESS` does not need to be set — `app.vercel_app` forces it on so the
 API uses a connectionless (NullPool) engine suited to serverless.
 
 ## 5. Deploy
 
 Trigger a deploy (push to the production branch, or **Deploy** in the dashboard).
-Vercel will build the SPA and the Python function together.
+Vercel will build the frontend and the backend services together.
 
 ## 6. Verify
 
@@ -87,6 +96,11 @@ Open the deployment URL and check:
 - No **Scan** bar or **Import Folder** button appears.
 - Curation still works if you use it (rename person, move faces, hide, label) —
   these write to Neon.
+- A deep link reloads cleanly: open `/all` or `/albums/<id>` directly (not via
+  in-app navigation) and the page renders instead of 404ing.
+- Sharing an album link shows its own preview: paste `/albums/<id>` into the
+  [Facebook Sharing Debugger](https://developers.facebook.com/tools/debug/) (or
+  Slack/iMessage) and confirm the album's title + cover, not the generic card.
 
 Quick API smoke test:
 
@@ -94,6 +108,11 @@ Quick API smoke test:
 curl -s https://<your-app>.vercel.app/api/health          # {"status":"ok"}
 curl -s -o /dev/null -w "%{http_code} %{content_type}\n" \
      https://<your-app>.vercel.app/api/thumb/1            # 200 image/jpeg
+
+# Deep link + per-album OG meta (served by the backend, not the static build):
+curl -s -o /dev/null -w "%{http_code}\n" https://<your-app>.vercel.app/all        # 200
+curl -s https://<your-app>.vercel.app/albums/1 \
+  | grep -iE '<title>|og:title|og:image'                 # album name + cover URL
 ```
 
 ## Updating the data later
@@ -105,9 +124,13 @@ database and restore a fresh dump.
 ## Troubleshooting
 
 - **`/api/...` returns 404 (lists empty, broken thumbnails).** The rewrite isn't
-  passing the full path to the function. Confirm `vercel.json` has the
-  `/api/:path*` → `/api` rewrite and that `api/index.py` mounts the app at `/api`.
-  Test the exact path with the `curl` commands above.
+  passing the full path to the backend. Confirm `vercel.json` has the `/api/(.*)`
+  → `backend` rewrite and that `app.vercel_app` mounts the app at `/api`. Test the
+  exact path with the `curl` commands above.
+- **Deep link 404s on reload (e.g. `/all`, `/albums/12`).** A client route is
+  reaching the static frontend instead of the backend SPA-shell fallback. Confirm
+  the root `vercel.json` routes non-asset paths to `backend` (the catch-all
+  `/(.*)` → `backend`), and that asset rewrites don't swallow client routes.
 - **500 / "too many connections".** `PHOTO_DATABASE_URL` is the direct host, not
   the pooled one. Switch to the `-pooler` string.
 - **Thumbnails 404 but lists load.** The dump predates in-DB thumbnails. Run

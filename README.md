@@ -8,7 +8,12 @@ groups them two ways:
 - **Similar** — embeds whole images (CLIP) and clusters visually similar
   photos, with a **"more like this"** nearest-neighbour search for any photo.
 
-Everything runs locally. Your photos never leave your machine.
+You can also collect photos into named **Albums** (a photo can live in several),
+each with a cover you pick or that defaults to a random member.
+
+Everything runs locally. Your photos never leave your machine. An optional
+browse-only deploy (frontend + DB-only API on Vercel, Postgres on Neon, no ML
+worker) is described in [`docs/deploy-vercel.md`](docs/deploy-vercel.md).
 
 ## Architecture
 
@@ -16,24 +21,22 @@ Split into three deployables plus the database. The heavy ML **worker** runs
 natively on the host (for Apple-Silicon MPS); the light **API**, the **frontend
 gateway**, and **Postgres** run in Docker.
 
+```mermaid
+flowchart TD
+    B[Browser] --> GW["Frontend + nginx gateway<br/>serves SPA, proxies by path<br/>Docker :8080"]
+    GW -->|"/api/scan /api/cluster /api/pick-folder<br/>/api/thumb /api/face-thumb /api/image"| WK["Worker (native host) :8001<br/>CLIP + InsightFace (MPS)<br/>HDBSCAN + media files"]
+    GW -->|"/api/ (persons /photos /faces<br/>/sim-clusters /albums /health)"| API["API (Docker) :8000<br/>persons + similarity"]
+    GW -->|"any other path → index.html<br/>(client-side routing)"| SPA[Static SPA build]
+    WK -->|SQLAlchemy| DB[(Postgres + pgvector<br/>Docker :5432)]
+    API -->|SQLAlchemy| DB
 ```
-                            ┌──────────────────────────────┐
-                            │  Frontend + nginx gateway     │  Docker :80
-  browser ────────────────► │  serves SPA, proxies by path  │
-                            └───────┬───────────────┬───────┘
-          /persons /sim-clusters    │               │   /scan /cluster /pick-folder
-          /photos /faces /health    │               │   /thumb /face-thumb /image
-                            ┌───────▼──────┐   ┌─────▼──────────────────────┐
-                            │  API         │   │  Worker (native host) :8001 │
-                            │  (Docker)    │   │  CLIP + InsightFace (MPS)   │
-                            │  persons+sim │   │  HDBSCAN + media files      │
-                            │  :8000       │   └─────┬──────────────────────┘
-                            └───────┬──────┘         │
-                                    │ SQLAlchemy      │ SQLAlchemy
-                                 ┌──▼─────────────────▼──┐
-                                 │ Postgres + pgvector     │  Docker :5432
-                                 └─────────────────────────┘
-```
+
+The whole backend surface sits under **`/api/*`** on one origin; the gateway
+strips the `/api` prefix before proxying. Client routes (`/all`, `/people`,
+`/albums/12`, …) are path-based (react-router `BrowserRouter`) and own the root
+paths, so the gateway falls back to `index.html` for any non-`/api` path — deep
+links survive a reload. See [`docs/architecture.md`](docs/architecture.md) for
+the full routing and single-origin story.
 
 - **Worker** (native, `app.main_worker`) — owns everything heavy or host-bound:
   the scan pipeline (CLIP `open_clip` ViT-B/32 image embeddings, InsightFace
@@ -46,8 +49,9 @@ gateway**, and **Postgres** run in Docker.
   similarity clusters. Pulls **none** of the ML stack, so the image is small and
   portable. Base deps only.
 - **Frontend + gateway** (Docker) — React + Vite built to static files, served by
-  nginx which also reverse-proxies each backend path to the right service, so the
-  browser sees a single origin (no CORS).
+  nginx which also reverse-proxies the backend (all under `/api/*`) to the right
+  service, so the browser sees a single origin (no CORS). Unknown non-`/api` paths
+  fall back to `index.html` for client-side routing.
 - **Postgres + pgvector** — photo metadata + 512-d embeddings, cosine kNN for
   similarity. Runs in Docker.
 
@@ -69,9 +73,10 @@ This boots:
 - `db` — `pgvector/pgvector:pg16` on `localhost:5432` (`photo` / `photo` / db
   `photos`), applying `backend/sql/001_init.sql`.
 - `api` — the slim persons/similarity API (internal `:8000`).
-- `frontend` — the SPA + nginx gateway on **http://localhost** (`:80`). It proxies
-  `/scan`, `/cluster`, `/pick-folder`, `/thumb`, `/face-thumb`, `/image` to the
-  native worker, and everything else to `api`.
+- `frontend` — the SPA + nginx gateway on **http://localhost:8080**. It proxies
+  `/api/scan`, `/api/cluster`, `/api/pick-folder`, `/api/thumb`, `/api/face-thumb`,
+  `/api/image` to the native worker, the rest of `/api/*` to `api`, and serves
+  `index.html` for every other path (client routing).
 
 ### 2. Run the native ML worker
 
@@ -91,9 +96,9 @@ PHOTO_DATABASE_URL=postgresql+psycopg://photo:photo@localhost:5432/photos \
 > Apple Silicon GPU.
 
 Check it's up: `curl localhost:8001/health` → `{"status":"ok"}`, and the gateway
-`curl localhost/health` → `{"status":"ok"}` (served by `api`).
+`curl localhost:8080/api/health` → `{"status":"ok"}` (served by `api`).
 
-Open **http://localhost**.
+Open **http://localhost:8080**.
 
 ### Dev alternative: run everything natively
 

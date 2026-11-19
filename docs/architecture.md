@@ -14,7 +14,7 @@ vs. the no-worker Vercel viewer).
 | **Worker** | FastAPI (`app.main_worker`), native host process | Heavy ML + ingest: scan pipeline, CLIP + InsightFace embedding, clustering, Google Drive download, folder picker. Serves original images. |
 | **API** | FastAPI (`app.main_api`), slim Docker / serverless | DB-only surface: persons, similarity, photos, and in-DB thumbnails. No ML stack. |
 | **Database** | Postgres + pgvector | Source of truth: photos, embeddings, faces, persons, clusters, thumbnail bytes. |
-| **Gateway** | nginx (local) / Vercel rewrites (prod) | One origin; routes paths to worker vs. API. |
+| **Gateway** | nginx (local) / Vercel rewrites + services (prod) | One origin; routes `/api/*` to the backend(s) and serves the SPA (with deep-link fallback) for everything else. |
 | **Google Drive** | — | Optional source of originals; also the display source for full-resolution images in the browser. |
 
 The split line is deliberate: the API's routers (`persons`, `sim`, `photos`,
@@ -30,10 +30,52 @@ All three import the same `app` package (shared `db`, `models`, `schemas`,
 - `app.main_worker` — `scan`, `cluster`, `media` + the pipeline/analyzer/clusterer.
 - `app.main_api` — `persons`, `sim`, `photos`, `media`, `/health`.
 - `app.main` — the combined all-in-one, for simple local dev.
+- `app.vercel_app` — the prod (Vercel) backend: mounts `app.main_api` under `/api`
+  and adds the SPA-shell + per-album social-preview routes (see **Routing &
+  single origin** below). Pulls none of the ML stack.
 
 `media` is mounted by both the worker and the API. On the worker it can read
 original files and face crops from disk; on the API it serves thumbnail **bytes**
 stored in the database (see below), so it needs no shared filesystem.
+
+## Routing & single origin
+
+The SPA and the backend share one origin, split by path prefix: **`/api/*` is the
+backend, everything else is a client route**. This is what lets the frontend use
+`react-router` **`BrowserRouter`** (clean, path-based URLs like `/albums/12` —
+no `#/…` fragment) without colliding with the API.
+
+Two consequences follow from path-based routing, and the gateway handles both:
+
+- **Deep links must survive a reload.** A direct load of `/all` or `/albums/12`
+  has no matching static file, so the gateway falls back to the SPA shell
+  (`index.html`) and React Router renders the route. Locally this is nginx
+  `try_files $uri $uri/ /index.html`; on Vercel it is the backend `spa_shell`
+  catch-all (the static frontend build has no SPA fallback of its own).
+- **Social crawlers need per-page meta in the static HTML.** Crawlers (Facebook,
+  Slack, iMessage, …) don't run JS, so a client-only SPA always shows the generic
+  preview. The `/albums/{id}` route is served by the backend, which fetches the
+  built `index.html`, injects that album's title + cover photo as Open
+  Graph/Twitter tags, and returns it. Humans get the same shell, so React boots
+  and renders normally; in-app, `react-helmet-async` keeps the live tab title in
+  sync. No `drive_file_id`/DB-less path still returns a valid generic preview.
+
+```mermaid
+flowchart TD
+    REQ([Incoming request]) --> P{Path prefix?}
+    P -->|"/api/*"| API["Backend API<br/>(/api → app.main_api)"]
+    P -->|"static asset<br/>/assets /icon.png …"| ST[Static SPA build]
+    P -->|"/albums/:id"| OG["Backend OG prerender<br/>inject title + cover meta"]
+    P -->|"any other path<br/>/all /people /similar …"| SHELL[Backend SPA shell]
+    OG -->|index.html + per-album meta| BR[Browser: React Router renders route]
+    SHELL -->|unmodified index.html| BR
+    ST --> BR
+```
+
+Locally the same split is expressed in `nginx.conf` / `nginx.neon.conf`; on Vercel
+in `vercel.json` rewrites plus the backend routes in `app.vercel_app`. Keeping the
+API under `/api` (frontend `VITE_API_BASE=/api`) is what frees the root paths for
+client routes.
 
 ## Data model
 
@@ -100,6 +142,7 @@ erDiagram
     albums {
         int id PK
         text name
+        int cover_photo_id FK
         timestamp created_at
     }
     photo_album {
@@ -126,7 +169,9 @@ Key points:
   case every photo it touches (new or already-indexed) is added to that album —
   "scan this folder straight into *Wedding*". Album create/rename/delete and
   manual add/remove are plain DB writes, so they work in the no-worker viewer
-  too.
+  too. **`cover_photo_id`** is the album's chosen cover; it is set to a random
+  member on first add and overridable per album, falling back to the first member
+  by id when unset or stale.
 
 ## Data flow
 
@@ -188,8 +233,9 @@ flowchart LR
 ```mermaid
 flowchart TD
     B[Browser] --> GW[nginx gateway<br/>:8080]
-    GW -->|"/scan /cluster /pick-folder<br/>/thumb /face-thumb /image"| WK[Worker<br/>native host :8001]
-    GW -->|"/persons /faces /sim-clusters<br/>/photos /health"| API[API container<br/>:8000]
+    GW -->|"/api/scan /api/cluster /api/pick-folder<br/>/api/thumb /api/face-thumb /api/image"| WK[Worker<br/>native host :8001]
+    GW -->|"/api/ (persons /faces /sim-clusters<br/>/photos /albums /health)"| API[API container<br/>:8000]
+    GW -->|"any other path → index.html<br/>(SPA deep-link fallback)"| SPA[Static SPA build]
     WK --> DB[(Postgres + pgvector<br/>container :5432)]
     API --> DB
     WK -.->|MPS · osascript picker<br/>photo library| HOST[Host resources]
@@ -204,16 +250,22 @@ flowchart TD
 The worker runs natively (not containerized) to keep Apple-Silicon MPS, the
 `osascript` folder picker, and direct access to the photo library. `db` and `api`
 and the `frontend`/gateway run under `docker compose -p photo-app`. Single origin
-through nginx means no CORS in normal use.
+through nginx means no CORS in normal use. The gateway strips the `/api` prefix
+with a trailing-slash `proxy_pass` before forwarding to the backends.
 
 ### No-worker viewer on Vercel
 
 ```mermaid
 flowchart TD
-    B[Browser] --> V{{Vercel edge}}
-    V -->|/| SPA[Static SPA<br/>frontend/dist]
-    V -->|/api/*  rewrite| FN[Python serverless fn<br/>api/index.py → app.main_api]
-    FN -->|pooled connection<br/>NullPool| NEON[(Neon<br/>Postgres + pgvector)]
+    B[Browser] --> V{{Vercel rewrites}}
+    V -->|"/assets /icon.png /og-image.png<br/>/favicon.ico /index.html"| SPA[frontend service<br/>static Vite build]
+    V -->|"/api/*"| BE
+    V -->|"/ and every other path"| BE[backend service<br/>app.vercel_app:app]
+    BE -->|"/api/* → mounted app.main_api"| APIMOUNT[DB-only API]
+    BE -->|"/albums/:id → inject album OG meta"| OGP[SPA shell + per-album preview]
+    BE -->|"any other path → SPA shell"| SHELL[index.html deep-link fallback]
+    APIMOUNT -->|NullPool connection| NEON[(Neon<br/>Postgres + pgvector)]
+    OGP -.->|reads name + cover| NEON
     B ==>|full-res images<br/>client-side| DRIVE[Google Drive]
 ```
 
@@ -222,11 +274,15 @@ What changes versus local:
 - **No worker.** Scan / cluster / folder import / original-image serving are not
   deployed. The data is prepared locally and loaded into Neon; prod is browse +
   curate only. The frontend hides scan UI when `VITE_NO_WORKER=1`.
-- **Single function, mounted under `/api`.** `api/index.py` mounts `app.main_api`
-  at `/api` and the frontend sets `VITE_API_BASE=/api`, so `/api/persons` →
-  `/persons` inside the app. `vercel.json` rewrites `/api/*` to the function;
-  everything else is the static SPA (one origin, no CORS).
-- **Connectionless engine.** `api/index.py` forces `PHOTO_SERVERLESS=1`, so
+- **Two Vercel services, one origin.** `vercel.json` declares a `backend`
+  (FastAPI, entrypoint `app.vercel_app:app`) and a `frontend` (Vite static build).
+  Rewrites peel static assets to the frontend and send `/api/*` **and every other
+  path** to the backend. The backend mounts `app.main_api` under `/api`
+  (`/api/persons` → `/persons` inside the app) and serves the SPA shell /
+  per-album OG prerender for the rest (see **Routing & single origin**). One
+  origin, no CORS. (A per-service nested `vercel.json` is ignored under the
+  services model — config lives in the root file.)
+- **Connectionless engine.** `app.vercel_app` forces `PHOTO_SERVERLESS=1`, so
   `app.db` builds the engine with `NullPool`. Each short-lived invocation opens
   and closes its own connection and relies on Neon's pooled endpoint, instead of
   keeping a per-instance pool that would exhaust Neon's connection limit across
