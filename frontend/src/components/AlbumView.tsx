@@ -1,3 +1,4 @@
+import { Helmet } from "react-helmet-async";
 import { useSearchParams } from "react-router-dom";
 import AllPhotosGrid from "./AllPhotosGrid";
 import PeopleGrid from "./PeopleGrid";
@@ -20,13 +21,11 @@ const TABS: { key: Tab; label: string; icon: string }[] = [
 // functional toolbars).
 export default function AlbumView({
   album,
-  onBack,
   onOpenPerson,
   onOpenSimilar,
   onAlbumChanged,
 }: {
   album: { id: number; name: string; coverPhotoId?: number | null };
-  onBack: () => void;
   onOpenPerson?: (id: number) => void;
   onOpenSimilar?: (id: number) => void;
   // Fired when the album's cover changes, so the parent card can refresh.
@@ -51,15 +50,14 @@ export default function AlbumView({
 
   return (
     <section className="flex flex-col flex-1">
+      {album.name && (
+        <Helmet>
+          <title>{album.name}</title>
+          <meta property="og:title" content={album.name} />
+          <meta name="twitter:title" content={album.name} />
+        </Helmet>
+      )}
       <div className="px-margin-md lg:px-margin-lg pt-space-lg pb-space-md border-b border-outline-variant/40 flex flex-wrap items-center gap-space-md bg-surface/50 backdrop-blur-sm">
-        <button
-          onClick={onBack}
-          title="Back to albums"
-          className="text-on-surface-variant hover:text-on-surface flex items-center gap-1 text-label-md font-label-md transition-colors"
-        >
-          <Icon name="arrow_back" className="text-xl" />
-          <span className="hidden sm:inline">Back</span>
-        </button>
         <h1 className="text-headline-md font-headline-md font-semibold text-on-surface tracking-tight break-words">{album.name}</h1>
         <div className="flex w-full md:w-auto md:inline-flex p-1 rounded-2xl bg-[#0c0e13] border border-[#232736] md:ml-auto">
           {TABS.map((t) => (

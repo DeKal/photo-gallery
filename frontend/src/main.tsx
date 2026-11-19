@@ -1,6 +1,7 @@
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
-import { HashRouter } from "react-router-dom";
+import { BrowserRouter } from "react-router-dom";
+import { HelmetProvider } from "react-helmet-async";
 import App from "./App";
 import "./index.css";
 
@@ -16,15 +17,17 @@ if (document.fonts && "ready" in document.fonts) {
 }
 setTimeout(revealFonts, 3000);
 
-// HashRouter (not BrowserRouter): the backend API owns root paths (/photos,
-// /albums, /persons, …) behind the same nginx origin, so client routes live
-// after the `#` to avoid colliding with them — and deep links survive a reload
-// with no server rewrite rules.
+// BrowserRouter (path-based routes): the backend API lives under /api on the
+// same origin, so client routes (/all, /people, /albums, …) own the root paths
+// without colliding. The gateway (nginx) and Vercel both fall back to
+// index.html for unknown paths, so deep links survive a reload.
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <HashRouter>
-      <App />
-    </HashRouter>
+    <HelmetProvider>
+      <BrowserRouter>
+        <App />
+      </BrowserRouter>
+    </HelmetProvider>
   </StrictMode>,
 );
 

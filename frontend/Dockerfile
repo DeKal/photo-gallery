@@ -6,12 +6,11 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
 COPY . .
-# Same-origin at runtime: BASE defaults to "" so the app calls the gateway with
-# bare paths (/persons, /thumb/...), which nginx.conf proxies. Force
-# VITE_API_BASE="" here because .env.production carries VITE_API_BASE=/api for
-# the Vercel single-origin deploy only — that prefix 404s against this local
-# gateway.
-ARG VITE_API_BASE=
+# Same-origin at runtime: the whole backend surface is proxied under /api by
+# the gateway (nginx.conf / nginx.neon.conf), matching the Vercel single-origin
+# deploy, so BASE is /api in every image build. The direct-dev workflow
+# (Vite :5173) overrides VITE_API_BASE to a full backend URL instead.
+ARG VITE_API_BASE=/api
 ENV VITE_API_BASE=$VITE_API_BASE
 # Scan/Import UI visibility. Explicit flag so it is SHOWN on local worker-dev
 # (default build: empty -> the app's NO_WORKER is false) and HIDDEN where there

@@ -113,10 +113,6 @@ export default function AlbumsGrid({
       <AlbumView
         key={`album-${detail.id}`}
         album={detail}
-        onBack={() => {
-          navigate("/albums");
-          load();
-        }}
         onAlbumChanged={load}
         onOpenPerson={onOpenPerson}
         onOpenSimilar={onOpenSimilar}

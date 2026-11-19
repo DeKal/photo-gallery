@@ -1,12 +1,13 @@
 // Typed REST client for the photo-clustering backend.
 //
-// In production the app is served behind an nginx gateway that proxies every
-// backend path to the right service (ML/media -> native worker, the rest -> the
-// api container), so BASE defaults to "" (same origin). For the direct-dev
+// In production the app is served behind a gateway that proxies every backend
+// path (mounted under /api) to the right service (ML/media -> native worker,
+// the rest -> the api container), so BASE defaults to "/api" (same origin,
+// path-based routing so the SPA can own the root paths). For the direct-dev
 // workflow (Vite on :5173, backends on their own ports) set VITE_API_BASE —
 // e.g. http://localhost:8000 for the combined app.
 export const BASE: string =
-  (import.meta.env.VITE_API_BASE as string | undefined) ?? "";
+  (import.meta.env.VITE_API_BASE as string | undefined) ?? "/api";
 
 // ---- Types ---------------------------------------------------------------
 
