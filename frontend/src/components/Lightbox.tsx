@@ -211,9 +211,8 @@ export default function Lightbox({ ids, index, onIndexChange, onClose, driveIds,
   // Drive-backed photos are shown from Drive first (index 0) and fall back to
   // the local copy on error — hence the per-image source index state.
   const driveId = driveIds?.[id] ?? null;
-  // Phones get a lighter 1200px render; desktops the sharper 2000px.
-  const viewW =
-    typeof window !== "undefined" && window.innerWidth < 640 ? 1200 : 2000;
+  // A single 3000px render for display on all screens.
+  const viewW = 3000;
   const fullSrcs = imageSources(id, driveId, viewW);
   const [fullI, setFullI] = useState(0);
   // Retry cycles after every candidate fails — Drive rate-limits (429) full

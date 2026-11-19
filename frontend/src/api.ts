@@ -151,7 +151,7 @@ export function downloadSources(
   driveFileId?: string | null,
 ): string[] {
   return driveFileId
-    ? [driveImageUrl(driveFileId, 2048), imageUrl(photoId)]
+    ? [driveImageUrl(driveFileId, 4096), imageUrl(photoId)]
     : [imageUrl(photoId)];
 }
 
