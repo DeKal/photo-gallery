@@ -10,9 +10,16 @@ COPY . .
 # bare paths (/persons, /thumb/...), which nginx.conf proxies. Force
 # VITE_API_BASE="" here because .env.production carries VITE_API_BASE=/api for
 # the Vercel single-origin deploy only — that prefix 404s against this local
-# gateway. VITE_NO_WORKER=1 (from .env.production) still applies: no scan UI.
+# gateway.
 ARG VITE_API_BASE=
 ENV VITE_API_BASE=$VITE_API_BASE
+# Scan/Import UI visibility. Explicit flag so it is SHOWN on local worker-dev
+# (default build: empty -> the app's NO_WORKER is false) and HIDDEN where there
+# is no ML worker: the Neon override passes VITE_NO_WORKER=1, and Vercel's own
+# build reads VITE_NO_WORKER=1 from .env.production. Set here so it overrides
+# .env.production for the local image.
+ARG VITE_NO_WORKER=
+ENV VITE_NO_WORKER=$VITE_NO_WORKER
 RUN npm run build
 
 FROM nginx:alpine

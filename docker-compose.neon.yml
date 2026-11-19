@@ -18,5 +18,10 @@ services:
     depends_on: []
 
   frontend:
+    build:
+      context: ./frontend
+      args:
+        # No ML worker in Neon mode -> hide the Scan/Import UI.
+        VITE_NO_WORKER: "1"
     volumes:
       - ./frontend/nginx.neon.conf:/etc/nginx/conf.d/default.conf:ro
