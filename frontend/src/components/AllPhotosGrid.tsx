@@ -356,7 +356,14 @@ export default function AllPhotosGrid({
             </button>
           </div>
         )}
-        {loading && items.length === 0 && <div className="text-outline py-12 text-center">Loading photos…</div>}
+        {loading && items.length === 0 && (
+          <div className="flex justify-center pt-2">
+            <span className="px-space-lg py-2 rounded-xl bg-surface-container border border-outline-variant text-on-surface text-label-md font-label-md flex items-center gap-2">
+              <Icon name="progress_activity" className="text-base animate-spin" />
+              Loading…
+            </span>
+          </div>
+        )}
       </div>
 
       {openPhoto != null && (() => {
