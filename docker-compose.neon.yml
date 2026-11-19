@@ -18,10 +18,12 @@ services:
     depends_on: []
 
   frontend:
+    # Scan/Import UI is SHOWN (default build ARG empty). Scanning needs the
+    # native ML worker running on the host, pointed at Neon:
+    #   cd backend && PHOTO_DATABASE_URL="$PHOTO_DATABASE_URL_NEON" \
+    #     .venv/bin/uvicorn app.main_worker:app --port 8001
+    # nginx.neon.conf proxies /scan,/cluster,/pick-folder to that worker.
     build:
       context: ./frontend
-      args:
-        # No ML worker in Neon mode -> hide the Scan/Import UI.
-        VITE_NO_WORKER: "1"
     volumes:
       - ./frontend/nginx.neon.conf:/etc/nginx/conf.d/default.conf:ro
