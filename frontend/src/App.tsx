@@ -128,11 +128,7 @@ export default function App() {
           element={<AllPhotosGrid key={`all-${refreshKey}`} onOpenPerson={openPerson} onOpenSimilar={openSimilar} />}
         />
         <Route
-          path="/people"
-          element={<PeopleGrid key={`people-${refreshKey}`} routed onOpenPerson={openPerson} onOpenSimilar={openSimilar} />}
-        />
-        <Route
-          path="/people/:personId"
+          path="/people/:personId?"
           element={<PeopleGrid key={`people-${refreshKey}`} routed onOpenPerson={openPerson} onOpenSimilar={openSimilar} />}
         />
         <Route
