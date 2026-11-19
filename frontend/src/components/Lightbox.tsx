@@ -59,6 +59,28 @@ export default function Lightbox({ ids, index, onIndexChange, onClose, driveIds,
       onLoadMore();
     }
   };
+
+  // Touch swipe (mobile): a horizontal drag past the threshold pages prev/next.
+  const touchStart = useRef<{ x: number; y: number } | null>(null);
+  const onTouchStart = (e: React.TouchEvent) => {
+    const t = e.touches[0];
+    touchStart.current = { x: t.clientX, y: t.clientY };
+  };
+  const onTouchEnd = (e: React.TouchEvent) => {
+    const s = touchStart.current;
+    touchStart.current = null;
+    if (!s) return;
+    const t = e.changedTouches[0];
+    const dx = t.clientX - s.x;
+    const dy = t.clientY - s.y;
+    // Horizontal, and clearly more horizontal than vertical (not a scroll).
+    if (Math.abs(dx) < 50 || Math.abs(dx) < Math.abs(dy)) return;
+    if (dx > 0) {
+      if (hasPrev) onIndexChange(index - 1);
+    } else {
+      goNext();
+    }
+  };
   useEffect(() => {
     if (wantNext && index < count - 1) {
       onIndexChange(index + 1);
@@ -357,7 +379,7 @@ export default function Lightbox({ ids, index, onIndexChange, onClose, driveIds,
         </button>
       )}
 
-      <div className="relative flex flex-col items-center cursor-default" onClick={(e) => e.stopPropagation()}>
+      <div className="relative flex flex-col items-center cursor-default" onClick={(e) => e.stopPropagation()} onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
         <div className="relative h-[70vh] sm:h-[86vh] flex items-center justify-center">
           {/* Single image: Drive first (index 0), local copy on error. A spinner
               covers the gap until it decodes — no separate thumbnail request. */}
