@@ -214,72 +214,78 @@ export default function PeopleGrid({
           </span>
         </div>
 
-        <div className="flex flex-wrap items-center gap-space-sm w-full md:w-auto">
-          {album == null && (
-            <div className="relative flex-1 min-w-[9rem] md:flex-none">
-              <Icon name="collections_bookmark" className="text-[16px] text-outline absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-              <select
-                data-testid="people-album-filter"
-                value={albumFilter ?? ""}
-                onChange={(e) => setAlbumFilter(e.target.value ? Number(e.target.value) : null)}
-                className="w-full h-9 pl-9 pr-8 appearance-none rounded-xl bg-[#171922] border border-[#232736] text-on-surface text-label-md font-label-md hover:border-outline-variant focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all cursor-pointer"
-              >
-                <option value="">All albums</option>
-                {albums.map((a) => (
-                  <option key={a.id} value={a.id}>{a.name}</option>
-                ))}
-              </select>
-              <Icon name="expand_more" className="text-[16px] text-outline absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-            </div>
-          )}
-          <div className="flex items-center bg-[#171922] border border-[#232736] rounded-xl px-3 h-9 focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-500/20 transition-all">
-            <Icon name="search" className="text-outline text-base mr-1.5" />
-            <input
-              type="text"
-              data-testid="people-search"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Filter by name…"
-              className="w-36 sm:w-48 bg-transparent text-on-surface text-label-md font-label-md outline-none border-none p-0 focus:ring-0 placeholder:text-outline"
-            />
-            {query && (
-              <button className="ml-1 text-outline hover:text-on-surface" title="Clear filter" onClick={() => setQuery("")}>
-                <Icon name="close" className="text-sm" />
-              </button>
-            )}
-          </div>
-          {!hiddenOnly && (
-            <label className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#171922] border border-[#232736] cursor-pointer hover:border-outline-variant">
-              <input className="sr-only peer" type="checkbox" checked={showHidden} onChange={() => setShowHidden((v) => !v)} />
-              <div className="w-8 h-4 bg-surface-container peer-checked:bg-indigo-600 rounded-full transition-colors relative">
-                <div className="w-3 h-3 bg-white rounded-full absolute top-0.5 left-0.5 peer-checked:left-[17px] transition-all" />
+        <div className="flex flex-col md:flex-row md:items-center gap-space-sm w-full md:w-auto">
+          {/* Row 1 (mobile): album filter + search */}
+          <div className="flex items-center gap-space-sm">
+            {album == null && (
+              <div className="relative flex-1 md:flex-none min-w-[9rem]">
+                <Icon name="collections_bookmark" className="text-[16px] text-outline absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <select
+                  data-testid="people-album-filter"
+                  value={albumFilter ?? ""}
+                  onChange={(e) => setAlbumFilter(e.target.value ? Number(e.target.value) : null)}
+                  className="w-full h-9 pl-9 pr-8 appearance-none rounded-xl bg-[#171922] border border-[#232736] text-on-surface text-label-md font-label-md hover:border-outline-variant focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all cursor-pointer"
+                >
+                  <option value="">All albums</option>
+                  {albums.map((a) => (
+                    <option key={a.id} value={a.id}>{a.name}</option>
+                  ))}
+                </select>
+                <Icon name="expand_more" className="text-[16px] text-outline absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
               </div>
-              <span className="text-label-md font-label-md text-on-surface-variant">Show hidden</span>
-            </label>
-          )}
-          <button
-            onClick={load}
-            disabled={loading}
-            title="Reload faces"
-            className="w-9 h-9 rounded-xl bg-[#171922] border border-[#232736] flex items-center justify-center text-outline hover:text-on-surface hover:border-outline-variant transition-colors disabled:opacity-45"
-          >
-            <Icon name="refresh" className={`text-lg ${loading ? "animate-spin" : ""}`} />
-          </button>
-          <div className="flex items-center bg-[#171922] border border-[#232736] rounded-xl p-0.5">
+            )}
+            <div className="flex items-center flex-1 md:flex-none bg-[#171922] border border-[#232736] rounded-xl px-3 h-9 focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-500/20 transition-all">
+              <Icon name="search" className="text-outline text-base mr-1.5" />
+              <input
+                type="text"
+                data-testid="people-search"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Filter by name…"
+                className="w-full md:w-48 bg-transparent text-on-surface text-label-md font-label-md outline-none border-none p-0 focus:ring-0 placeholder:text-outline"
+              />
+              {query && (
+                <button className="ml-1 text-outline hover:text-on-surface" title="Clear filter" onClick={() => setQuery("")}>
+                  <Icon name="close" className="text-sm" />
+                </button>
+              )}
+            </div>
+          </div>
+          {/* Row 2 (mobile): show-hidden + reload + density */}
+          <div className="flex items-center gap-space-sm">
+            {!hiddenOnly && (
+              <label className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#171922] border border-[#232736] cursor-pointer hover:border-outline-variant">
+                <input className="sr-only peer" type="checkbox" checked={showHidden} onChange={() => setShowHidden((v) => !v)} />
+                <div className="w-8 h-4 bg-surface-container peer-checked:bg-indigo-600 rounded-full transition-colors relative">
+                  <div className="w-3 h-3 bg-white rounded-full absolute top-0.5 left-0.5 peer-checked:left-[17px] transition-all" />
+                </div>
+                <span className="text-label-md font-label-md text-on-surface-variant">Show hidden</span>
+              </label>
+            )}
             <button
-              onClick={() => setDensity("comfortable")}
-              className={`p-1 rounded-lg ${density === "comfortable" ? "bg-surface-container-high text-primary" : "text-outline hover:text-on-surface"}`}
-              title="Comfortable grid"
+              onClick={load}
+              disabled={loading}
+              title="Reload faces"
+              className="w-9 h-9 rounded-xl bg-[#171922] border border-[#232736] flex items-center justify-center text-outline hover:text-on-surface hover:border-outline-variant transition-colors disabled:opacity-45"
             >
-              <Icon name="grid_view" className="text-base" />
+              <Icon name="refresh" className={`text-lg ${loading ? "animate-spin" : ""}`} />
             </button>
-            <button
-              onClick={() => setDensity("compact")}
-              className={`p-1 rounded-lg ${density === "compact" ? "bg-surface-container-high text-primary" : "text-outline hover:text-on-surface"}`}
-              title="Compact grid"
-            >
-              <Icon name="apps" className="text-base" />
-            </button>
+            <div className="flex items-center bg-[#171922] border border-[#232736] rounded-xl p-0.5">
+              <button
+                onClick={() => setDensity("comfortable")}
+                className={`p-1 rounded-lg ${density === "comfortable" ? "bg-surface-container-high text-primary" : "text-outline hover:text-on-surface"}`}
+                title="Comfortable grid"
+              >
+                <Icon name="grid_view" className="text-base" />
+              </button>
+              <button
+                onClick={() => setDensity("compact")}
+                className={`p-1 rounded-lg ${density === "compact" ? "bg-surface-container-high text-primary" : "text-outline hover:text-on-surface"}`}
+                title="Compact grid"
+              >
+                <Icon name="apps" className="text-base" />
+              </button>
+            </div>
           </div>
         </div>
       </section>
