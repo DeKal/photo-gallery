@@ -278,11 +278,11 @@ export default function PersonDetail({ personId, album, onBack, onChanged, onOpe
                   )}
                 </div>
               </div>
-            </section>
 
-            {/* Cover face picker */}
-            {facesOpen && (
-              <section className="p-5 rounded-2xl bg-surface-container border border-outline-variant" data-testid="face-picker">
+              {/* Cover face picker — merged into the hero card, revealed by the
+                  "Change cover face" toggle above. */}
+              {facesOpen && (
+                <div className="mt-space-lg pt-space-lg border-t border-outline-variant relative z-10" data-testid="face-picker">
                 {loadingFaces ? (
                   <div className="text-outline py-6 text-center text-body-sm">Loading faces…</div>
                 ) : faces.length === 0 ? (
@@ -351,8 +351,9 @@ export default function PersonDetail({ personId, album, onBack, onChanged, onOpe
                 </div>
                   </>
                 )}
-              </section>
-            )}
+                </div>
+              )}
+            </section>
 
             {/* Gallery */}
             <section className="space-y-space-md">
