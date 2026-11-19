@@ -252,7 +252,7 @@ export default function PeopleGrid({
             </div>
           </div>
           {/* Row 2 (mobile): show-hidden + reload + density */}
-          <div className="flex items-center gap-space-sm">
+          <div className="flex items-center gap-space-sm justify-end">
             {!hiddenOnly && (
               <label className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#171922] border border-[#232736] cursor-pointer hover:border-outline-variant">
                 <input className="sr-only peer" type="checkbox" checked={showHidden} onChange={() => setShowHidden((v) => !v)} />
