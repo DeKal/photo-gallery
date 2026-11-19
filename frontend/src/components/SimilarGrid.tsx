@@ -249,9 +249,6 @@ export default function SimilarGrid({
   return (
     <section className={SECTION}>
       <div className="flex items-center justify-between gap-space-md mb-space-lg flex-wrap">
-        <span className="font-body-md text-body-md text-on-surface-variant font-medium">
-          {q ? `${visible.length} of ${clusters.length}` : clusters.length} similar {clusters.length === 1 ? "set" : "sets"}
-        </span>
         <div className="flex flex-wrap items-center gap-space-sm w-full md:w-auto">
           {album == null && (
             <div className="relative flex-1 min-w-[9rem] md:flex-none">
