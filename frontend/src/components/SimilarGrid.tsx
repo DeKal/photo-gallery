@@ -252,15 +252,15 @@ export default function SimilarGrid({
         <span className="font-body-md text-body-md text-on-surface-variant font-medium">
           {q ? `${visible.length} of ${clusters.length}` : clusters.length} similar {clusters.length === 1 ? "set" : "sets"}
         </span>
-        <div className="flex items-center gap-space-sm">
+        <div className="flex flex-wrap items-center gap-space-sm w-full md:w-auto">
           {album == null && (
-            <div className="relative">
+            <div className="relative flex-1 min-w-[9rem] md:flex-none">
               <Icon name="collections_bookmark" className="text-[16px] text-outline absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
               <select
                 data-testid="sim-album-filter"
                 value={albumFilter ?? ""}
                 onChange={(e) => setAlbumFilter(e.target.value ? Number(e.target.value) : null)}
-                className="h-11 pl-9 pr-8 appearance-none rounded-xl bg-surface-container border border-outline-variant/60 text-on-surface text-body-sm font-body-sm hover:border-outline-variant focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all cursor-pointer"
+                className="w-full h-11 pl-9 pr-8 appearance-none rounded-xl bg-surface-container border border-outline-variant/60 text-on-surface text-body-sm font-body-sm hover:border-outline-variant focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 transition-all cursor-pointer"
               >
                 <option value="">All albums</option>
                 {albums.map((a) => (
@@ -270,7 +270,7 @@ export default function SimilarGrid({
               <Icon name="expand_more" className="text-[16px] text-outline absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
             </div>
           )}
-          <div className="flex items-center bg-surface-container border border-outline-variant/60 rounded-xl px-3 h-11 focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20 transition-all">
+          <div className="flex items-center flex-1 md:flex-none bg-surface-container border border-outline-variant/60 rounded-xl px-3 h-11 focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20 transition-all">
             <Icon name="search" className="text-outline text-base mr-1.5" />
             <input
               type="text"
@@ -278,7 +278,7 @@ export default function SimilarGrid({
               value={query}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Filter sets by person name…"
-              className="w-44 sm:w-56 bg-transparent text-on-surface text-body-sm font-body-sm outline-none border-none p-0 focus:ring-0 placeholder:text-outline"
+              className="w-full md:w-56 bg-transparent text-on-surface text-body-sm font-body-sm outline-none border-none p-0 focus:ring-0 placeholder:text-outline"
             />
             {query && (
               <button className="ml-1 text-outline hover:text-on-surface" title="Clear filter" onClick={() => setQuery("")}>

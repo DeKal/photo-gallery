@@ -214,15 +214,15 @@ export default function PeopleGrid({
           </span>
         </div>
 
-        <div className="flex items-center gap-space-sm">
+        <div className="flex flex-wrap items-center gap-space-sm w-full md:w-auto">
           {album == null && (
-            <div className="relative">
+            <div className="relative flex-1 min-w-[9rem] md:flex-none">
               <Icon name="collections_bookmark" className="text-[16px] text-outline absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
               <select
                 data-testid="people-album-filter"
                 value={albumFilter ?? ""}
                 onChange={(e) => setAlbumFilter(e.target.value ? Number(e.target.value) : null)}
-                className="h-9 pl-9 pr-8 appearance-none rounded-xl bg-[#171922] border border-[#232736] text-on-surface text-label-md font-label-md hover:border-outline-variant focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all cursor-pointer"
+                className="w-full h-9 pl-9 pr-8 appearance-none rounded-xl bg-[#171922] border border-[#232736] text-on-surface text-label-md font-label-md hover:border-outline-variant focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all cursor-pointer"
               >
                 <option value="">All albums</option>
                 {albums.map((a) => (
