@@ -63,6 +63,10 @@ export default function PersonDetail({ personId, album, onBack, onChanged, onOpe
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [faces, setFaces] = useState<Face[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingPhotos, setLoadingPhotos] = useState(true);
+  const [facesOpen, setFacesOpen] = useState(false);
+  const [facesLoaded, setFacesLoaded] = useState(false);
+  const [loadingFaces, setLoadingFaces] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [name, setName] = useState("");
   const [saving, setSaving] = useState(false);
@@ -87,19 +91,58 @@ export default function PersonDetail({ personId, album, onBack, onChanged, onOpe
     }
   }
 
+  // Load person metadata first so the hero paints immediately, then the photo
+  // grid. Faces (the cover-face picker) are deferred until the user asks for
+  // them — they're the heaviest list and rarely needed on every visit.
   useEffect(() => {
     setLoading(true);
-    Promise.all([getPerson(personId, album), getPersonPhotos(personId, album), getPersonFaces(personId, album)])
-      .then(([p, ph, fc]) => {
+    getPerson(personId, album)
+      .then((p) => {
         setPerson(p);
-        setPhotos(ph);
-        setFaces(fc);
         setName(p.name ?? "");
         setError(null);
       })
       .catch((e) => setError(e instanceof Error ? e.message : String(e)))
       .finally(() => setLoading(false));
   }, [personId, album]);
+
+  useEffect(() => {
+    setLoadingPhotos(true);
+    getPersonPhotos(personId, album)
+      .then((ph) => setPhotos(ph))
+      .catch((e) => setError(e instanceof Error ? e.message : String(e)))
+      .finally(() => setLoadingPhotos(false));
+  }, [personId, album]);
+
+  // Reset the lazy faces panel whenever we switch person/album.
+  useEffect(() => {
+    setFaces([]);
+    setFacesOpen(false);
+    setFacesLoaded(false);
+    setShowAllFaces(false);
+  }, [personId, album]);
+
+  async function loadFaces() {
+    if (facesLoaded || loadingFaces) return;
+    setLoadingFaces(true);
+    try {
+      const fc = await getPersonFaces(personId, album);
+      setFaces(fc);
+      setFacesLoaded(true);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e));
+    } finally {
+      setLoadingFaces(false);
+    }
+  }
+
+  function toggleFaces() {
+    setFacesOpen((v) => {
+      const next = !v;
+      if (next) void loadFaces();
+      return next;
+    });
+  }
 
   async function save() {
     if (!name.trim()) return;
@@ -220,13 +263,32 @@ export default function PersonDetail({ personId, album, onBack, onChanged, onOpe
                       {saving ? "Saving…" : "Save"}
                     </button>
                   </div>
+
+                  {/* Lazy cover-face picker toggle — faces are fetched only on
+                      first open so the page paints without waiting for them. */}
+                  {person.face_count > 1 && (
+                    <button
+                      data-testid="toggle-faces"
+                      onClick={toggleFaces}
+                      className="flex items-center gap-1 text-label-sm font-label-md text-outline hover:text-primary transition-colors"
+                    >
+                      <Icon name={facesOpen ? "expand_less" : "tune"} className="text-[15px]" />
+                      {loadingFaces ? "Loading faces…" : facesOpen ? "Hide cover face options" : "Change cover face"}
+                    </button>
+                  )}
                 </div>
               </div>
             </section>
 
             {/* Cover face picker */}
-            {faces.length > 1 && (
+            {facesOpen && (
               <section className="p-5 rounded-2xl bg-surface-container border border-outline-variant" data-testid="face-picker">
+                {loadingFaces ? (
+                  <div className="text-outline py-6 text-center text-body-sm">Loading faces…</div>
+                ) : faces.length === 0 ? (
+                  <div className="text-outline py-6 text-center text-body-sm">No faces to choose from.</div>
+                ) : (
+                  <>
                 <div className="flex items-center justify-between mb-space-md gap-space-md">
                   <div>
                     <h2 className="text-label-md font-label-md font-semibold text-on-surface flex items-center gap-2">
@@ -287,6 +349,8 @@ export default function PersonDetail({ personId, album, onBack, onChanged, onOpe
                     </button>
                   ))}
                 </div>
+                  </>
+                )}
               </section>
             )}
 
@@ -311,7 +375,10 @@ export default function PersonDetail({ personId, album, onBack, onChanged, onOpe
                 </div>
               </div>
 
-              {!loading && photos.length === 0 && (
+              {loadingPhotos && photos.length === 0 && (
+                <div className="text-outline py-12 text-center">Loading photos…</div>
+              )}
+              {!loadingPhotos && photos.length === 0 && (
                 <div className="text-outline py-12 text-center">No photos for this person.</div>
               )}
 
