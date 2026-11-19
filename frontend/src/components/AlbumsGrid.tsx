@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   getAlbums,
+  getAlbum,
   createAlbum,
   deleteAlbum,
   renameAlbum,
@@ -39,6 +40,26 @@ export default function AlbumsGrid({
   const params = useParams();
   const openAlbumId = params.albumId ? Number(params.albumId) : null;
   const selected = openAlbumId != null ? albums.find((a) => a.id === openAlbumId) ?? null : null;
+  // Fetch just the open album's metadata so the detail header shows instantly,
+  // without waiting on the full album list. Falls back to the list entry once
+  // that loads (whichever lands first wins; they carry the same data).
+  const [detailAlbum, setDetailAlbum] = useState<Album | null>(null);
+  useEffect(() => {
+    if (openAlbumId == null) {
+      setDetailAlbum(null);
+      return;
+    }
+    let alive = true;
+    getAlbum(openAlbumId)
+      .then((a) => {
+        if (alive) setDetailAlbum(a);
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [openAlbumId]);
+  const metadata = selected ?? detailAlbum;
   // Modal for naming an album; replaces window.prompt for create + rename.
   const [dialog, setDialog] = useState<{ mode: "create" } | { mode: "rename"; album: Album } | null>(null);
 
@@ -80,11 +101,18 @@ export default function AlbumsGrid({
     }
   };
 
-  if (selected) {
+  if (openAlbumId != null) {
+    // Render the detail view straight away from the URL id — don't wait for the
+    // album list to load (which would flash the albums grid first). Name/cover
+    // fill in once the list resolves; the child grids key off the id so they
+    // load immediately and don't remount when the name arrives.
+    const detail = metadata
+      ? { id: metadata.id, name: metadata.name, coverPhotoId: metadata.cover_photo_id }
+      : { id: openAlbumId, name: "", coverPhotoId: null };
     return (
       <AlbumView
-        key={`album-${selected.id}`}
-        album={{ id: selected.id, name: selected.name, coverPhotoId: selected.cover_photo_id }}
+        key={`album-${detail.id}`}
+        album={detail}
         onBack={() => {
           navigate("/albums");
           load();
@@ -138,7 +166,7 @@ export default function AlbumsGrid({
                 {a.cover_photo_id != null ? (
                   <ImgWithFallback
                     className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-                    sources={thumbSources(a.cover_photo_id, a.cover_drive_file_id)}
+                    sources={thumbSources(a.cover_photo_id, a.cover_drive_file_id, 800)}
                     alt={a.name}
                     placeholder={coverPlaceholder}
                   />

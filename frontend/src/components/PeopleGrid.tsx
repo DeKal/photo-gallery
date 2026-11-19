@@ -28,6 +28,8 @@ interface Props {
   hiddenOnly?: boolean;
   // When set, People are scoped to this album (counts/covers reflect it).
   album?: number;
+  // Name of the pinned album, shown in a locked filter slot in album-detail.
+  albumName?: string;
   // URL-driven mode (top-level People): the open person comes from /people/:id
   // and opening/closing navigates, so the person detail is a shareable link.
   // Omitted when embedded in album detail, where open state stays internal.
@@ -43,6 +45,7 @@ export default function PeopleGrid({
   initialShowHidden = false,
   hiddenOnly = false,
   album,
+  albumName,
   routed = false,
   focus = null,
   onOpenPerson,
@@ -268,7 +271,7 @@ export default function PeopleGrid({
         <div className="flex flex-col md:flex-row md:items-center gap-space-sm w-full md:w-auto">
           {/* Row 1 (mobile): album filter + search */}
           <div className="flex items-center gap-space-sm">
-            {album == null && (
+            {album == null ? (
               <div className="relative flex-1 md:flex-none min-w-[9rem]">
                 <Icon name="collections_bookmark" className="text-[16px] text-outline absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                 <select
@@ -284,6 +287,22 @@ export default function PeopleGrid({
                 </select>
                 <Icon name="expand_more" className="text-[16px] text-outline absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
               </div>
+            ) : (
+              albumName && (
+                <div className="relative flex-1 md:flex-none min-w-[9rem]">
+                  <Icon name="collections_bookmark" className="text-[16px] text-outline absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                  <select
+                    data-testid="people-album-filter"
+                    disabled
+                    value="pinned"
+                    aria-label={`Album: ${albumName}`}
+                    className="w-full h-9 pl-9 pr-8 appearance-none rounded-xl bg-[#171922] border border-[#232736] text-on-surface text-label-md font-label-md opacity-90 cursor-not-allowed focus:outline-none"
+                  >
+                    <option value="pinned">{albumName}</option>
+                  </select>
+                  <Icon name="expand_more" className="text-[16px] text-outline absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+                </div>
+              )
             )}
             <div className="flex items-center flex-1 md:flex-none bg-[#171922] border border-[#232736] rounded-xl px-3 h-9 focus-within:border-indigo-500 focus-within:ring-2 focus-within:ring-indigo-500/20 transition-all">
               <Icon name="search" className="text-outline text-base mr-1.5" />

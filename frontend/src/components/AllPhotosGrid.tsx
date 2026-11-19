@@ -102,6 +102,11 @@ export default function AllPhotosGrid({
   // Which member photo is the album cover (highlighted star). Seeded from the
   // album prop, updated optimistically when the user picks a new one.
   const [coverId, setCoverId] = useState<number | null | undefined>(album?.coverPhotoId);
+  // The album detail renders before its name/cover load (straight from the URL),
+  // so keep the highlighted cover in sync when that info arrives.
+  useEffect(() => {
+    setCoverId(album?.coverPhotoId);
+  }, [album?.coverPhotoId]);
   const setCover = async (photoId: number) => {
     if (!album) return;
     try {
@@ -191,7 +196,23 @@ export default function AllPhotosGrid({
         </div>
 
         <div className="flex flex-wrap items-center gap-space-sm w-full md:w-auto">
-          {!album && (
+          {album ? (
+            // Album-pinned: same dropdown slot as All Photos, but locked to this
+            // album so the toolbar matches the global view.
+            <div className="relative flex-1 min-w-[9rem] md:flex-none">
+              <Icon name="collections_bookmark" className="text-[16px] text-outline absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <select
+                data-testid="album-filter"
+                disabled
+                value="pinned"
+                aria-label={`Album: ${album.name}`}
+                className="w-full h-11 pl-9 pr-8 appearance-none rounded-xl bg-surface-container border border-outline-variant/60 text-on-surface text-label-md font-label-md opacity-90 cursor-not-allowed focus:outline-none"
+              >
+                <option value="pinned">{album.name}</option>
+              </select>
+              <Icon name="expand_more" className="text-[16px] text-outline absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+            </div>
+          ) : (
             <div className="relative flex-1 min-w-[9rem] md:flex-none">
               <Icon name="collections_bookmark" className="text-[16px] text-outline absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
               <select

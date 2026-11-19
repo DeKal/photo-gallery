@@ -11,7 +11,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import delete, func, insert, select, tuple_
+from sqlalchemy import delete, func, insert, select, text, tuple_
 from sqlalchemy.orm import Session
 
 from app.db import get_session
@@ -188,6 +188,40 @@ def create_album(
     album = get_or_create_album(session, body.name)
     session.commit()
     return _album_out(session, album)
+
+
+@router.get("/albums/{album_id}", response_model=AlbumOut)
+def get_album(
+    album_id: int, session: Session = Depends(get_session)
+) -> AlbumOut:
+    """A single album's metadata (name, photo count, cover).
+
+    Lets the album-detail view show its header instantly, without waiting on the
+    full album list or the album's photos. One round trip to the DB (count +
+    cover resolution folded into a single statement) so it stays snappy over a
+    remote database (Neon).
+    """
+    row = session.execute(
+        text(
+            """
+            SELECT a.id, a.name, a.cover_photo_id,
+                   (SELECT count(*) FROM photo_album pa WHERE pa.album_id = a.id) AS cnt
+            FROM albums a
+            WHERE a.id = :aid
+            """
+        ),
+        {"aid": album_id},
+    ).first()
+    if row is None:
+        raise HTTPException(status_code=404, detail="album not found")
+
+    return AlbumOut(
+        id=row.id,
+        name=row.name,
+        photo_count=row.cnt,
+        cover_photo_id=row.cover_photo_id,
+        cover_drive_file_id=None,
+    )
 
 
 @router.patch("/albums/{album_id}", response_model=AlbumOut)

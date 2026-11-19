@@ -54,18 +54,19 @@ export default function AlbumView({
       <div className="px-margin-md lg:px-margin-lg pt-space-lg pb-space-md border-b border-outline-variant/40 flex flex-wrap items-center gap-space-md bg-surface/50 backdrop-blur-sm">
         <button
           onClick={onBack}
-          className="px-space-md py-1.5 rounded-xl bg-surface-container border border-outline-variant hover:border-outline text-on-surface text-label-md font-label-md flex items-center gap-1.5 hover:bg-surface-container-high transition-colors"
+          title="Back to albums"
+          className="text-on-surface-variant hover:text-on-surface flex items-center gap-1 text-label-md font-label-md transition-colors"
         >
-          <Icon name="arrow_back" className="text-base" />
-          Back
+          <Icon name="arrow_back" className="text-xl" />
+          <span className="hidden sm:inline">Back</span>
         </button>
         <h1 className="text-headline-md font-headline-md font-semibold text-on-surface tracking-tight break-words">{album.name}</h1>
-        <div className="inline-flex p-1 rounded-2xl bg-[#0c0e13] border border-[#232736] ml-auto">
+        <div className="flex w-full md:w-auto md:inline-flex p-1 rounded-2xl bg-[#0c0e13] border border-[#232736] md:ml-auto">
           {TABS.map((t) => (
             <button
               key={t.key}
               onClick={() => setTab(t.key)}
-              className={`flex items-center gap-2 px-space-lg py-1.5 rounded-xl font-label-md text-label-md transition-colors ${
+              className={`flex-1 md:flex-none flex items-center justify-center gap-2 px-space-lg py-1.5 rounded-xl font-label-md text-label-md transition-colors ${
                 tab === t.key
                   ? "bg-gradient-to-r from-indigo-500 to-violet-600 text-white shadow-md shadow-indigo-500/30"
                   : "text-on-surface-variant hover:text-on-surface hover:bg-surface-container"
@@ -92,6 +93,7 @@ export default function AlbumView({
         <PeopleGrid
           key={`album-people-${album.id}`}
           album={album.id}
+          albumName={album.name}
           onOpenPerson={onOpenPerson}
           onOpenSimilar={onOpenSimilar}
         />
@@ -100,6 +102,7 @@ export default function AlbumView({
         <SimilarGrid
           key={`album-similar-${album.id}`}
           album={album.id}
+          albumName={album.name}
           onOpenPerson={onOpenPerson}
           onOpenSimilar={onOpenSimilar}
         />

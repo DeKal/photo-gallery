@@ -127,9 +127,10 @@ export function driveOriginalUrl(fileId: string): string {
 export function thumbSources(
   photoId: number,
   driveFileId?: string | null,
+  size = 500,
 ): string[] {
   return driveFileId
-    ? [driveThumbUrl(driveFileId), thumbUrl(photoId)]
+    ? [driveThumbUrl(driveFileId, size), thumbUrl(photoId)]
     : [thumbUrl(photoId)];
 }
 
@@ -420,6 +421,12 @@ export interface Album {
 
 export function getAlbums(): Promise<Album[]> {
   return request("/albums");
+}
+
+// A single album's metadata (name/count/cover) — for the detail header, so it
+// shows instantly without waiting on the full album list.
+export function getAlbum(id: number): Promise<Album> {
+  return request(`/albums/${id}`);
 }
 
 // Albums a single photo currently belongs to (for membership toggles).
