@@ -176,7 +176,7 @@ export default function AllPhotosGrid({
             </button>
           )}
           {!embedded && (
-            <h1 className="text-headline-md font-headline-md font-semibold text-on-surface tracking-tight">{album ? album.name : "All Photos"}</h1>
+            <h1 className="text-headline-sm md:text-headline-md font-headline-md font-semibold text-on-surface tracking-tight">{album ? album.name : "All Photos"}</h1>
           )}
           <span className="px-space-sm py-0.5 rounded-full bg-surface-container-high border border-outline-variant/40 text-on-surface-variant text-label-sm font-label-sm">
             {total} photos{album || albumFilter != null ? " in album" : " indexed"}

@@ -90,7 +90,7 @@ export default function App() {
             <div className="flex items-center gap-space-md">
               {peopleActive && (
                 <>
-                  <h1 className="text-headline-md font-headline-md font-semibold text-on-surface tracking-tight">People</h1>
+                  <h1 className="text-headline-sm md:text-headline-md font-headline-md font-semibold text-on-surface tracking-tight">People</h1>
                   {counts.people != null && (
                     <span className="px-space-sm py-0.5 rounded-full bg-surface-container-high border border-outline-variant/40 text-on-surface-variant text-label-sm font-label-sm">
                       {counts.people} people
@@ -100,7 +100,7 @@ export default function App() {
               )}
               {nav === "similar" && (
                 <>
-                  <h1 className="text-headline-md font-headline-md font-semibold text-on-surface tracking-tight">Similar</h1>
+                  <h1 className="text-headline-sm md:text-headline-md font-headline-md font-semibold text-on-surface tracking-tight">Similar</h1>
                   {counts.similar != null && (
                     <span className="px-space-sm py-0.5 rounded-full bg-surface-container-high border border-outline-variant/40 text-on-surface-variant text-label-sm font-label-sm">
                       {counts.similar} sets
