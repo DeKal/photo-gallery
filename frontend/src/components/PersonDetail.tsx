@@ -270,7 +270,7 @@ export default function PersonDetail({ personId, album, onBack, onChanged, onOpe
                     <button
                       data-testid="toggle-faces"
                       onClick={toggleFaces}
-                      className="flex items-center gap-1 text-label-sm font-label-md text-outline hover:text-primary transition-colors"
+                      className="flex items-center gap-1 text-label-sm font-label-md text-primary hover:text-white transition-colors"
                     >
                       <Icon name={facesOpen ? "expand_less" : "tune"} className="text-[15px]" />
                       {loadingFaces ? "Loading faces…" : facesOpen ? "Hide cover face options" : "Change cover face"}
