@@ -20,6 +20,11 @@ ENV VITE_API_BASE=$VITE_API_BASE
 # .env.production for the local image.
 ARG VITE_NO_WORKER=
 ENV VITE_NO_WORKER=$VITE_NO_WORKER
+# Destructive curation (select/merge, hide person) visibility. Default empty ->
+# shown on local desktop (hidden on mobile via the md breakpoint). Vercel reads
+# VITE_READONLY=1 from .env.production to hide it everywhere (browse-only).
+ARG VITE_READONLY=
+ENV VITE_READONLY=$VITE_READONLY
 RUN npm run build
 
 FROM nginx:alpine

@@ -4,6 +4,11 @@ import { getPersons, getAlbums, mergePersons, hidePerson, unhidePerson, faceThum
 import ImgWithFallback from "./ImgWithFallback";
 import PersonDetail from "./PersonDetail";
 import Icon from "./Icon";
+import { useIsDesktop } from "../useIsDesktop";
+
+// Curation (select/merge, hide) is disabled on read-only deploys (Vercel sets
+// VITE_READONLY=1) and on mobile, where these destructive actions aren't used.
+const READONLY = import.meta.env.VITE_READONLY === "1";
 
 const personPlaceholder = (
   <div className="w-full h-full flex items-center justify-center bg-gradient-to-b from-surface-container to-surface text-outline-variant" aria-hidden="true">
@@ -42,6 +47,9 @@ export default function PeopleGrid({
   const navigate = useNavigate();
   const params = useParams();
   const routedPersonId = routed && params.personId ? Number(params.personId) : null;
+
+  // Select/merge + hide are shown only on desktop and only when not read-only.
+  const canCurate = useIsDesktop() && !READONLY;
 
   const [persons, setPersons] = useState<Person[]>([]);
   const [loading, setLoading] = useState(true);
@@ -189,7 +197,8 @@ export default function PeopleGrid({
       {/* GALLERY CONTROLS & STATS BAR */}
       <section className="px-space-lg lg:px-margin-lg py-space-md flex flex-wrap items-center justify-between gap-space-md">
         <div className="flex items-center gap-space-md">
-          {!selectMode ? (
+          {canCurate &&
+            (!selectMode ? (
             <button
               onClick={() => setSelectMode(true)}
               className="px-space-md py-1.5 rounded-xl bg-[#171922] border border-[#232736] hover:border-primary text-on-surface text-label-md font-label-md flex items-center gap-2 transition-colors"
@@ -207,7 +216,7 @@ export default function PeopleGrid({
               </button>
               <span className="text-body-sm font-body-sm text-outline">{selected.size} selected</span>
             </>
-          )}
+          ))}
           <span className="text-body-sm font-body-sm text-outline">
             Showing <strong className="text-on-surface font-semibold">{visible.length} {hiddenOnly ? "hidden" : visible.length === 1 ? "subject" : "identified subjects"}</strong>
             {q && persons.length !== visible.length ? <span className="text-outline"> of {persons.length}</span> : null}
@@ -341,7 +350,7 @@ export default function PeopleGrid({
                 )}
 
                 {/* Hide badge (top-right) */}
-                {!selectMode && (
+                {!selectMode && canCurate && (
                   <div className={`absolute top-2.5 right-2.5 z-20 transition-opacity ${p.hidden ? "opacity-100" : "opacity-0 group-hover:opacity-100"}`}>
                     <button
                       data-testid="person-hide-btn"
@@ -406,7 +415,7 @@ export default function PeopleGrid({
       </section>
 
       {/* FLOATING STATUS / ACTION DOCK */}
-      {selectMode && selected.size >= 2 ? (
+      {canCurate && selectMode && selected.size >= 2 ? (
         <aside className="fixed bottom-20 md:bottom-6 left-1/2 -translate-x-1/2 z-30 flex items-center gap-space-md px-space-xl py-space-sm bg-[#171922]/90 backdrop-blur-xl border border-white/10 rounded-full shadow-2xl shadow-black/80 ring-1 ring-white/5">
           <p className="text-label-md font-label-md text-on-surface border-r border-[#232736] pr-space-lg">{selected.size} selected</p>
           <button
@@ -419,6 +428,7 @@ export default function PeopleGrid({
           </button>
         </aside>
       ) : (
+        canCurate &&
         !selectMode &&
         persons.length > 0 && (
           <aside className="fixed bottom-20 md:bottom-6 left-1/2 -translate-x-1/2 z-30 flex items-center gap-space-sm px-space-lg py-space-sm bg-[#171922]/90 backdrop-blur-xl border border-white/10 rounded-full shadow-2xl shadow-black/80 ring-1 ring-white/5">
