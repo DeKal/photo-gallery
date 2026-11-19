@@ -245,14 +245,14 @@ export default function Lightbox({ ids, index, onIndexChange, onClose, driveIds,
             void toggleFavorite();
           }}
           title={favorite ? "Starred" : "Star photo"}
-          className={`h-10 px-space-md rounded-full backdrop-blur-md border font-label-md text-label-md active:scale-[0.98] transition-all flex items-center gap-2 ${
+          className={`h-10 w-10 justify-center px-0 sm:w-auto sm:px-space-md sm:justify-start rounded-full backdrop-blur-md border font-label-md text-label-md active:scale-[0.98] transition-all flex items-center gap-2 ${
             favorite
               ? "bg-amber-400/15 border-amber-400/40 text-amber-400 hover:text-amber-300"
               : "bg-[#171922]/80 border-white/10 text-on-surface hover:text-white hover:border-white/30"
           }`}
         >
           <Icon name={favorite ? "star" : "star_border"} className="text-base" />
-          {favorite ? "Starred" : "Star"}
+          <span className="hidden sm:inline">{favorite ? "Starred" : "Star"}</span>
         </button>
         <button
           data-testid="lightbox-download"
@@ -261,10 +261,10 @@ export default function Lightbox({ ids, index, onIndexChange, onClose, driveIds,
             void downloadPhoto(id, driveId);
           }}
           title="Download photo"
-          className="h-10 px-space-md rounded-full bg-gradient-to-r from-indigo-500 to-violet-600 hover:opacity-90 text-white font-label-md text-label-md shadow-lg shadow-indigo-500/30 active:scale-[0.98] transition-all flex items-center gap-2"
+          className="h-10 w-10 justify-center px-0 sm:w-auto sm:px-space-md sm:justify-start rounded-full bg-gradient-to-r from-indigo-500 to-violet-600 hover:opacity-90 text-white font-label-md text-label-md shadow-lg shadow-indigo-500/30 active:scale-[0.98] transition-all flex items-center gap-2"
         >
           <Icon name="download" className="text-base" />
-          Download
+          <span className="hidden sm:inline">Download</span>
         </button>
         <button
           aria-label="Close"
@@ -281,10 +281,10 @@ export default function Lightbox({ ids, index, onIndexChange, onClose, driveIds,
           data-testid="lightbox-add-album"
           onClick={() => void toggleAlbumMenu()}
           title="Add to album"
-          className="h-10 px-space-md rounded-full bg-[#171922]/80 backdrop-blur-md border border-white/10 hover:border-white/30 text-on-surface hover:text-white font-label-md text-label-md active:scale-[0.98] transition-all flex items-center gap-2"
+          className="h-10 w-10 justify-center px-0 sm:w-auto sm:px-space-md sm:justify-start rounded-full bg-[#171922]/80 backdrop-blur-md border border-white/10 hover:border-white/30 text-on-surface hover:text-white font-label-md text-label-md active:scale-[0.98] transition-all flex items-center gap-2"
         >
           <Icon name="bookmark_add" className="text-base" />
-          Add to album
+          <span className="hidden sm:inline">Add to album</span>
         </button>
         {albumMenu && (
           <div className="absolute top-full mt-2 left-0 w-56 max-h-72 overflow-y-auto custom-scroll rounded-xl bg-[#171922] border border-white/10 shadow-2xl py-1 z-10">
@@ -332,7 +332,7 @@ export default function Lightbox({ ids, index, onIndexChange, onClose, driveIds,
             e.stopPropagation();
             onIndexChange(index - 1);
           }}
-          className="fixed left-4 top-1/2 -translate-y-1/2 w-11 h-11 rounded-full bg-[#171922]/80 backdrop-blur-md border border-white/10 text-on-surface hover:text-white hover:border-white/30 flex items-center justify-center transition-all"
+          className="fixed left-4 top-1/2 -translate-y-1/2 z-20 w-11 h-11 rounded-full bg-[#171922]/80 backdrop-blur-md border border-white/10 text-on-surface hover:text-white hover:border-white/30 flex items-center justify-center transition-all"
         >
           <Icon name="chevron_left" className="text-2xl" />
         </button>
@@ -346,7 +346,7 @@ export default function Lightbox({ ids, index, onIndexChange, onClose, driveIds,
             e.stopPropagation();
             goNext();
           }}
-          className="fixed right-4 top-1/2 -translate-y-1/2 w-11 h-11 rounded-full bg-[#171922]/80 backdrop-blur-md border border-white/10 text-on-surface hover:text-white hover:border-white/30 flex items-center justify-center transition-all"
+          className="fixed right-4 top-1/2 -translate-y-1/2 z-20 w-11 h-11 rounded-full bg-[#171922]/80 backdrop-blur-md border border-white/10 text-on-surface hover:text-white hover:border-white/30 flex items-center justify-center transition-all"
         >
           <Icon name="chevron_right" className="text-2xl" />
         </button>
@@ -401,7 +401,7 @@ export default function Lightbox({ ids, index, onIndexChange, onClose, driveIds,
             </button>
           )}
         </div>
-        <div className="mt-4 flex flex-col items-center gap-3">
+        <div className="absolute top-full left-1/2 -translate-x-1/2 w-[94vw] flex flex-col items-center gap-3">
           {note && (
             <div className="text-label-sm font-label-sm text-emerald-400 flex items-center gap-1.5">
               <Icon name="check_circle" className="text-base" />
