@@ -120,6 +120,12 @@ export default function SimilarGrid({
   // ?photo id can be mapped to a position in the lightbox.
   const [panel, setPanel] = useState<{ ids: number[]; driveIds: Record<number, string | null>; names: Record<number, string> }>({ ids: [], driveIds: {}, names: {} });
   const [query, setQuery] = useState("");
+  // Debounce the name filter so typing doesn't re-filter on every keystroke.
+  const [debounced, setDebounced] = useState("");
+  useEffect(() => {
+    const t = setTimeout(() => setDebounced(query), 250);
+    return () => clearTimeout(t);
+  }, [query]);
   // Top-level Similar can be narrowed to one album; when embedded in album-detail
   // the `album` prop pins it and this picker is hidden.
   const [albums, setAlbums] = useState<Album[]>([]);
@@ -240,7 +246,7 @@ export default function SimilarGrid({
     );
   }
 
-  const q = query.trim().toLowerCase();
+  const q = debounced.trim().toLowerCase();
   const visible = q
     ? clusters.filter(
         (c) =>
@@ -300,7 +306,7 @@ export default function SimilarGrid({
         <div className="text-outline py-12 text-center">No similarity clusters yet. Scan a folder to get started.</div>
       )}
       {!loading && clusters.length > 0 && visible.length === 0 && (
-        <div className="text-outline py-12 text-center">No sets contain a person matching “{query}”.</div>
+        <div className="text-outline py-12 text-center">No sets contain a person matching “{debounced}”.</div>
       )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-gutter-lg">
