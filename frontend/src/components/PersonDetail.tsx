@@ -145,18 +145,6 @@ export default function PersonDetail({ personId, album, onBack, onChanged, onOpe
             <Icon name="arrow_back" className="text-[18px]" />
             <span>Back to People</span>
           </button>
-          <div className="flex items-center gap-space-sm">
-            <button
-              data-testid="export-faces-btn"
-              onClick={() => void downloadCurrentFace()}
-              disabled={exporting || loading || !person || (person.cover_face_id == null && faces.length === 0)}
-              title="Download the current cover face crop"
-              className="px-space-md py-1.5 rounded-xl border border-outline-variant bg-surface-container text-on-surface-variant hover:text-on-surface hover:border-outline text-label-md font-label-md flex items-center gap-space-xs transition-colors disabled:opacity-45 disabled:cursor-not-allowed"
-            >
-              <Icon name={exporting ? "progress_activity" : "download"} className={`text-[18px] ${exporting ? "animate-spin" : ""}`} />
-              <span className="hidden sm:inline">{exporting ? "Downloading…" : "Download Face"}</span>
-            </button>
-          </div>
         </div>
 
         {error && (
@@ -183,9 +171,18 @@ export default function PersonDetail({ personId, album, onBack, onChanged, onOpe
                       placeholder={facePlaceholder}
                     />
                   </div>
+                  <button
+                    data-testid="export-faces-btn"
+                    onClick={() => void downloadCurrentFace()}
+                    disabled={exporting || loading || !person || (person.cover_face_id == null && faces.length === 0)}
+                    title="Download the current cover face crop"
+                    className="absolute top-2 right-2 w-8 h-8 rounded-full bg-surface-container-lowest/80 backdrop-blur-md border border-white/10 text-on-surface-variant hover:text-white hover:border-white/30 flex items-center justify-center transition-colors disabled:opacity-45 disabled:cursor-not-allowed"
+                  >
+                    <Icon name={exporting ? "progress_activity" : "download"} className={`text-[16px] ${exporting ? "animate-spin" : ""}`} />
+                  </button>
                   <div className="absolute bottom-2 right-2 bg-surface-container-lowest/80 backdrop-blur-md px-2 py-0.5 rounded-md border border-white/10 text-[11px] font-mono text-primary flex items-center gap-1">
                     <Icon name="verified" className="text-[12px]" style={{ fontVariationSettings: "'FILL' 1" }} />
-                    <span>Primary</span>
+                    <span>Verified</span>
                   </div>
                 </div>
 
