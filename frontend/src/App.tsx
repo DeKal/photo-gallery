@@ -79,10 +79,14 @@ export default function App() {
     <AppShell nav={nav} onNav={onNav} onImportFolder={NO_WORKER ? undefined : importFolder} counts={counts}>
       {showScanHeader && (
         <section className="p-space-lg lg:px-margin-lg lg:pt-space-xl border-b border-outline-variant/60 bg-[#111318]/70 backdrop-blur-md">
-          {!NO_WORKER && <ScanBar onClustered={reload} path={scanPath} onPathChange={setScanPath} />}
+          {!NO_WORKER && (
+            <div className="hidden md:block">
+              <ScanBar onClustered={reload} path={scanPath} onPathChange={setScanPath} />
+            </div>
+          )}
 
           {/* Segmented mode switch: People vs Similar */}
-          <div className={`flex items-center justify-between ${NO_WORKER ? "" : "mt-space-lg border-t border-outline-variant/40 pt-space-md"}`}>
+          <div className={`flex items-center justify-between ${NO_WORKER ? "" : "md:mt-space-lg md:border-t md:border-outline-variant/40 md:pt-space-md"}`}>
             <div className="flex items-center gap-space-md">
               {peopleActive && (
                 <>
@@ -114,7 +118,7 @@ export default function App() {
       )}
 
       {nav === "all" && !NO_WORKER && (
-        <section className="p-space-lg lg:px-margin-lg lg:pt-space-xl border-b border-outline-variant/60 bg-[#111318]/70 backdrop-blur-md">
+        <section className="hidden md:block p-space-lg lg:px-margin-lg lg:pt-space-xl border-b border-outline-variant/60 bg-[#111318]/70 backdrop-blur-md">
           <ScanBar onClustered={reload} path={scanPath} onPathChange={setScanPath} />
         </section>
       )}
