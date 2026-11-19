@@ -337,7 +337,7 @@ export default function AllPhotosGrid({
                       </button>
                     </>
                   )}
-                  <div className="absolute inset-x-0 bottom-0 p-2 bg-gradient-to-t from-surface-dim/95 via-surface-dim/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity flex flex-col gap-1.5">
+                  <div className="absolute inset-x-0 bottom-0 p-2 bg-gradient-to-t from-surface-dim/95 via-surface-dim/60 to-transparent opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-opacity flex flex-col gap-1.5">
                     {p.persons.length > 0 && (
                       <div className="flex flex-wrap gap-1">
                         {p.persons.slice(0, 3).map((pp) => (
