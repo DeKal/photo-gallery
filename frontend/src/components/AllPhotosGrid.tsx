@@ -344,7 +344,7 @@ export default function AllPhotosGrid({
           </div>
         ))}
 
-        {hasMore && (
+        {hasMore && items.length > 0 && (
           <div ref={sentinelRef} className="flex justify-center pt-2">
             <button
               onClick={() => loadPage(items.length, order, debounced, false)}
