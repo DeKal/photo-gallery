@@ -251,8 +251,8 @@ export default function PeopleGrid({
               )}
             </div>
           </div>
-          {/* Row 2 (mobile): show-hidden + reload + density */}
-          <div className="flex items-center gap-space-sm justify-end">
+          {/* Row 2 (mobile): show-hidden left, reload + density right */}
+          <div className="flex items-center gap-space-sm">
             {!hiddenOnly && (
               <label className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#171922] border border-[#232736] cursor-pointer hover:border-outline-variant">
                 <input className="sr-only peer" type="checkbox" checked={showHidden} onChange={() => setShowHidden((v) => !v)} />
@@ -262,29 +262,31 @@ export default function PeopleGrid({
                 <span className="text-label-md font-label-md text-on-surface-variant">Show hidden</span>
               </label>
             )}
-            <button
-              onClick={load}
-              disabled={loading}
-              title="Reload faces"
-              className="w-9 h-9 rounded-xl bg-[#171922] border border-[#232736] flex items-center justify-center text-outline hover:text-on-surface hover:border-outline-variant transition-colors disabled:opacity-45"
-            >
-              <Icon name="refresh" className={`text-lg ${loading ? "animate-spin" : ""}`} />
-            </button>
-            <div className="flex items-center bg-[#171922] border border-[#232736] rounded-xl p-0.5">
+            <div className="flex items-center gap-space-sm ml-auto">
               <button
-                onClick={() => setDensity("comfortable")}
-                className={`p-1 rounded-lg ${density === "comfortable" ? "bg-surface-container-high text-primary" : "text-outline hover:text-on-surface"}`}
-                title="Comfortable grid"
+                onClick={load}
+                disabled={loading}
+                title="Reload faces"
+                className="w-9 h-9 rounded-xl bg-[#171922] border border-[#232736] flex items-center justify-center text-outline hover:text-on-surface hover:border-outline-variant transition-colors disabled:opacity-45"
               >
-                <Icon name="grid_view" className="text-base" />
+                <Icon name="refresh" className={`text-lg ${loading ? "animate-spin" : ""}`} />
               </button>
-              <button
-                onClick={() => setDensity("compact")}
-                className={`p-1 rounded-lg ${density === "compact" ? "bg-surface-container-high text-primary" : "text-outline hover:text-on-surface"}`}
-                title="Compact grid"
-              >
-                <Icon name="apps" className="text-base" />
-              </button>
+              <div className="flex items-center bg-[#171922] border border-[#232736] rounded-xl p-0.5">
+                <button
+                  onClick={() => setDensity("comfortable")}
+                  className={`p-1 rounded-lg ${density === "comfortable" ? "bg-surface-container-high text-primary" : "text-outline hover:text-on-surface"}`}
+                  title="Comfortable grid"
+                >
+                  <Icon name="grid_view" className="text-base" />
+                </button>
+                <button
+                  onClick={() => setDensity("compact")}
+                  className={`p-1 rounded-lg ${density === "compact" ? "bg-surface-container-high text-primary" : "text-outline hover:text-on-surface"}`}
+                  title="Compact grid"
+                >
+                  <Icon name="apps" className="text-base" />
+                </button>
+              </div>
             </div>
           </div>
         </div>
