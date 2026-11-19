@@ -219,14 +219,6 @@ export default function PersonDetail({ personId, album, onBack, onChanged, onOpe
                     >
                       {saving ? "Saving…" : "Save"}
                     </button>
-                    <button
-                      disabled
-                      title="needs face-level selection (future)"
-                      className="h-11 px-4 rounded-xl border border-outline-variant bg-surface-container-low text-on-surface-variant text-label-md font-label-md opacity-45 cursor-not-allowed flex items-center gap-1.5"
-                    >
-                      <Icon name="call_split" className="text-[16px]" />
-                      <span>Merge / Split…</span>
-                    </button>
                   </div>
                 </div>
               </div>
