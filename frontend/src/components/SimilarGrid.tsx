@@ -274,7 +274,7 @@ export default function SimilarGrid({
               data-testid="sim-search"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Filter sets by person name…"
+              placeholder="Filter by name…"
               className="w-full md:w-56 bg-transparent text-on-surface text-body-sm font-body-sm outline-none border-none p-0 focus:ring-0 placeholder:text-outline"
             />
             {query && (
