@@ -365,14 +365,9 @@ export default function PersonDetail({ personId, album, onBack, onChanged, onOpe
                     {photos.length}
                   </span>
                 </div>
-                <div className="flex items-center bg-surface-container rounded-lg border border-outline-variant p-0.5">
-                  <span className="p-1 rounded bg-surface-container-high text-primary" title="Dense grid">
-                    <Icon name="grid_view" className="text-[16px]" />
-                  </span>
-                  <span className="p-1 rounded text-outline" title="Comfortable grid">
-                    <Icon name="view_module" className="text-[16px]" />
-                  </span>
-                </div>
+                <span className="shrink-0 p-1.5 rounded-lg bg-surface-container border border-outline-variant text-primary" title="Dense grid">
+                  <Icon name="grid_view" className="text-[16px]" />
+                </span>
               </div>
 
               {loadingPhotos && photos.length === 0 && (
