@@ -61,15 +61,17 @@ export default function AppShell({ nav, onNav, onImportFolder, children }: Props
         <aside className="hidden md:flex flex-col h-[calc(100vh-4rem)] p-space-md w-64 shrink-0 bg-surface-container-lowest border-r border-outline-variant">
           {/* Rail header */}
           <div className="flex flex-col gap-space-lg">
-            <div className="flex items-center gap-space-sm px-space-sm pt-space-xs">
-              <div className="w-8 h-8 rounded-lg bg-surface-container-high flex items-center justify-center text-primary ring-1 ring-outline-variant">
-                <Icon name="dns" className="text-lg" />
+            {onImportFolder && (
+              <div className="flex items-center gap-space-sm px-space-sm pt-space-xs">
+                <div className="w-8 h-8 rounded-lg bg-surface-container-high flex items-center justify-center text-primary ring-1 ring-outline-variant">
+                  <Icon name="dns" className="text-lg" />
+                </div>
+                <div>
+                  <p className="text-label-md font-label-md font-semibold text-on-surface">Local Archive</p>
+                  <p className="text-body-sm font-body-sm text-outline">Direct drive indexing</p>
+                </div>
               </div>
-              <div>
-                <p className="text-label-md font-label-md font-semibold text-on-surface">Local Archive</p>
-                <p className="text-body-sm font-body-sm text-outline">Direct drive indexing</p>
-              </div>
-            </div>
+            )}
             {onImportFolder && (
               <button
                 onClick={onImportFolder}

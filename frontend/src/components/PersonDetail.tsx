@@ -286,7 +286,7 @@ export default function PersonDetail({ personId, album, onBack, onChanged, onOpe
               {facesOpen && (
                 <div className="mt-space-lg pt-space-lg border-t border-outline-variant relative z-10" data-testid="face-picker">
                 {loadingFaces ? (
-                  <div className="text-outline py-6 text-center text-body-sm">Loading faces…</div>
+                  <div className="py-6 flex justify-center"><LoadingPill /></div>
                 ) : faces.length === 0 ? (
                   <div className="text-outline py-6 text-center text-body-sm">No faces to choose from.</div>
                 ) : (
