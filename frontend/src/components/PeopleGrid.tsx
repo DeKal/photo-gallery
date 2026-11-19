@@ -268,14 +268,6 @@ export default function PeopleGrid({
               </label>
             )}
             <div className="flex items-center gap-space-sm ml-auto">
-              <button
-                onClick={load}
-                disabled={loading}
-                title="Reload faces"
-                className="w-9 h-9 rounded-xl bg-[#171922] border border-[#232736] flex items-center justify-center text-outline hover:text-on-surface hover:border-outline-variant transition-colors disabled:opacity-45"
-              >
-                <Icon name="refresh" className={`text-lg ${loading ? "animate-spin" : ""}`} />
-              </button>
               <div className="flex items-center bg-[#171922] border border-[#232736] rounded-xl p-0.5">
                 <button
                   onClick={() => setDensity("comfortable")}
