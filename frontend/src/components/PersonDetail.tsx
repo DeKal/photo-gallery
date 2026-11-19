@@ -197,8 +197,8 @@ export default function PersonDetail({ personId, album, onBack, onChanged, onOpe
                   </div>
 
                   {/* Inline rename */}
-                  <div className="flex flex-wrap items-center gap-space-sm pt-1">
-                    <div className="relative flex-1 min-w-[240px] max-w-sm">
+                  <div className="flex items-center gap-space-sm pt-1">
+                    <div className="relative flex-1 min-w-0 max-w-sm">
                       <input
                         type="text"
                         data-testid="person-name-input"
@@ -215,7 +215,7 @@ export default function PersonDetail({ personId, album, onBack, onChanged, onOpe
                       data-testid="person-save-btn"
                       onClick={() => void save()}
                       disabled={saving || !name.trim()}
-                      className="h-11 px-5 rounded-xl btn-gradient text-white font-medium text-label-md font-label-md active:scale-[0.98] transition-all disabled:opacity-45 disabled:cursor-not-allowed"
+                      className="shrink-0 h-11 px-5 rounded-xl btn-gradient text-white font-medium text-label-md font-label-md active:scale-[0.98] transition-all disabled:opacity-45 disabled:cursor-not-allowed"
                     >
                       {saving ? "Saving…" : "Save"}
                     </button>
