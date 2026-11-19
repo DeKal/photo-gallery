@@ -217,10 +217,6 @@ export default function PeopleGrid({
               <span className="text-body-sm font-body-sm text-outline">{selected.size} selected</span>
             </>
           ))}
-          <span className="text-body-sm font-body-sm text-outline">
-            Showing <strong className="text-on-surface font-semibold">{visible.length} {hiddenOnly ? "hidden" : visible.length === 1 ? "subject" : "identified subjects"}</strong>
-            {q && persons.length !== visible.length ? <span className="text-outline"> of {persons.length}</span> : null}
-          </span>
         </div>
 
         <div className="flex flex-col md:flex-row md:items-center gap-space-sm w-full md:w-auto">
