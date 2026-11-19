@@ -66,7 +66,7 @@ def list_photos(
             select(Face.id)
             .join(FacePerson, FacePerson.face_id == Face.id)
             .join(Person, Person.id == FacePerson.person_id)
-            .where(Face.photo_id == Photo.id, Person.name.ilike(like))
+            .where(Face.photo_id == Photo.id, Person.name.ilike(like), Person.hidden.is_(False))
             .correlate(Photo)
             .exists()
         )
@@ -109,7 +109,7 @@ def list_photos(
             select(Face.photo_id, Person.id, Person.name)
             .join(FacePerson, FacePerson.face_id == Face.id)
             .join(Person, Person.id == FacePerson.person_id)
-            .where(Face.photo_id.in_(photo_ids))
+            .where(Face.photo_id.in_(photo_ids), Person.hidden.is_(False))
         ).all()
         for photo_id, person_id, name in pp:
             persons_by_photo.setdefault(photo_id, {})[person_id] = name
@@ -151,7 +151,7 @@ def photo_persons(
         select(Person.id, Person.name)
         .join(FacePerson, FacePerson.person_id == Person.id)
         .join(Face, Face.id == FacePerson.face_id)
-        .where(Face.photo_id == photo_id)
+        .where(Face.photo_id == photo_id, Person.hidden.is_(False))
         .distinct()
     ).all()
     persons = [PhotoPerson(id=pid, name=name) for pid, name in rows]

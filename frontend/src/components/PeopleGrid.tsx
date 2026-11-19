@@ -464,7 +464,7 @@ export default function PeopleGrid({
 
       {/* FLOATING STATUS / ACTION DOCK */}
       {canCurate && selectMode && selected.size >= 2 ? (
-        <aside className="fixed bottom-20 md:bottom-6 left-1/2 -translate-x-1/2 z-30 flex items-center gap-space-md px-space-xl py-space-sm bg-[#171922]/90 backdrop-blur-xl border border-white/10 rounded-full shadow-2xl shadow-black/80 ring-1 ring-white/5">
+        <aside className="fixed bottom-20 md:bottom-6 left-1/2 md:left-[calc(50%+8rem)] -translate-x-1/2 z-30 flex items-center gap-space-md px-space-xl py-space-sm bg-[#171922]/90 backdrop-blur-xl border border-white/10 rounded-full shadow-2xl shadow-black/80 ring-1 ring-white/5">
           <p className="text-label-md font-label-md text-on-surface border-r border-[#232736] pr-space-lg">{selected.size} selected</p>
           <button
             onClick={() => void doMerge()}
@@ -479,7 +479,7 @@ export default function PeopleGrid({
         canCurate &&
         !selectMode &&
         persons.length > 0 && (
-          <aside className="fixed bottom-20 md:bottom-6 left-1/2 -translate-x-1/2 z-30 flex items-center gap-space-sm px-space-lg py-space-sm bg-[#171922]/90 backdrop-blur-xl border border-white/10 rounded-full shadow-2xl shadow-black/80 ring-1 ring-white/5">
+          <aside className="fixed bottom-20 md:bottom-6 left-1/2 md:left-[calc(50%+8rem)] -translate-x-1/2 z-30 flex items-center gap-space-sm px-space-lg py-space-sm bg-[#171922]/90 backdrop-blur-xl border border-white/10 rounded-full shadow-2xl shadow-black/80 ring-1 ring-white/5">
             <button
               onClick={() => setSelectMode(true)}
               className="px-space-md py-1.5 rounded-xl bg-surface-container-high hover:bg-surface-variant text-on-surface border border-outline-variant text-label-md font-label-md active:scale-[0.98] transition-all flex items-center gap-1.5"
