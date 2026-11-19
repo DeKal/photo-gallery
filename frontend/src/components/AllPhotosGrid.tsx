@@ -3,6 +3,7 @@ import { getPhotos, getAlbums, removePhotosFromAlbum, setAlbumCover, thumbSource
 import { usePhotoParam } from "../useRouteState";
 import ImgWithFallback from "./ImgWithFallback";
 import Lightbox from "./Lightbox";
+import LoadingPill from "./LoadingPill";
 import Icon from "./Icon";
 
 const PAGE = 120;
@@ -356,14 +357,7 @@ export default function AllPhotosGrid({
             </button>
           </div>
         )}
-        {loading && items.length === 0 && (
-          <div className="flex justify-center pt-2">
-            <span className="px-space-lg py-2 rounded-xl bg-surface-container border border-outline-variant text-on-surface text-label-md font-label-md flex items-center gap-2">
-              <Icon name="progress_activity" className="text-base animate-spin" />
-              Loading…
-            </span>
-          </div>
-        )}
+        {loading && items.length === 0 && <LoadingPill />}
       </div>
 
       {openPhoto != null && (() => {

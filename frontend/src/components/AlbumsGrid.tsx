@@ -11,6 +11,7 @@ import {
 import AlbumView from "./AlbumView";
 import AlbumDialog from "./AlbumDialog";
 import ImgWithFallback from "./ImgWithFallback";
+import LoadingPill from "./LoadingPill";
 import Icon from "./Icon";
 
 const coverPlaceholder = (
@@ -184,7 +185,7 @@ export default function AlbumsGrid({
           ))}
         </div>
 
-        {loading && albums.length === 0 && <div className="text-outline py-12 text-center">Loading albums…</div>}
+        {loading && albums.length === 0 && <LoadingPill />}
       </div>
 
       {dialog && (

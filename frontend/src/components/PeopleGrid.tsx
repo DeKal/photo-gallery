@@ -3,6 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { getPersons, getAlbums, mergePersons, hidePerson, unhidePerson, faceThumbUrl, thumbUrl, type Album, type Person } from "../api";
 import ImgWithFallback from "./ImgWithFallback";
 import PersonDetail from "./PersonDetail";
+import LoadingPill from "./LoadingPill";
 import Icon from "./Icon";
 import { useIsDesktop } from "../useIsDesktop";
 
@@ -297,7 +298,7 @@ export default function PeopleGrid({
             {error}
           </div>
         )}
-        {loading && <div className="text-outline py-12 text-center">Loading people…</div>}
+        {loading && <LoadingPill />}
         {!loading && persons.length === 0 && (
           <div className="text-outline py-12 text-center">
             {hiddenOnly ? "No hidden people." : "No people yet. Scan a folder to get started."}

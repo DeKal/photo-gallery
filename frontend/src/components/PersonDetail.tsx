@@ -14,6 +14,7 @@ import {
 } from "../api";
 import ImgWithFallback from "./ImgWithFallback";
 import Lightbox from "./Lightbox";
+import LoadingPill from "./LoadingPill";
 import { usePhotoParam } from "../useRouteState";
 import Icon from "./Icon";
 
@@ -196,7 +197,7 @@ export default function PersonDetail({ personId, album, onBack, onChanged, onOpe
             {error}
           </div>
         )}
-        {loading && <div className="text-outline py-12 text-center">Loading person…</div>}
+        {loading && <LoadingPill />}
 
         {person && (
           <>
@@ -376,9 +377,7 @@ export default function PersonDetail({ personId, album, onBack, onChanged, onOpe
                 </div>
               </div>
 
-              {loadingPhotos && photos.length === 0 && (
-                <div className="text-outline py-12 text-center">Loading photos…</div>
-              )}
+              {loadingPhotos && photos.length === 0 && <LoadingPill />}
               {!loadingPhotos && photos.length === 0 && (
                 <div className="text-outline py-12 text-center">No photos for this person.</div>
               )}

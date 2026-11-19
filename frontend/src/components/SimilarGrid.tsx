@@ -15,6 +15,7 @@ import {
 import { usePhotoParam } from "../useRouteState";
 import ImgWithFallback from "./ImgWithFallback";
 import Lightbox from "./Lightbox";
+import LoadingPill from "./LoadingPill";
 import Icon from "./Icon";
 
 const photoPlaceholder = (
@@ -292,7 +293,7 @@ export default function SimilarGrid({
           {error}
         </div>
       )}
-      {loading && <div className="text-outline py-12 text-center">Loading clusters…</div>}
+      {loading && <LoadingPill />}
       {!loading && clusters.length === 0 && (
         <div className="text-outline py-12 text-center">No similarity clusters yet. Scan a folder to get started.</div>
       )}
@@ -404,7 +405,7 @@ function ClusterPhotos({
           {error}
         </div>
       )}
-      {loading && <div className="text-outline py-12 text-center">Loading photos…</div>}
+      {loading && <LoadingPill />}
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2">
         {photos.map((photo) => (
           <PhotoTile
@@ -464,7 +465,7 @@ function SimilarPanel({
             {error}
           </div>
         )}
-        {loading && <div className="text-outline py-12 text-center">Finding similar photos…</div>}
+        {loading && <LoadingPill />}
         {!loading && results.length === 0 && <div className="text-outline py-12 text-center">No similar photos found.</div>}
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2">
           {results.map((r) => (
