@@ -156,9 +156,6 @@ export default function PersonDetail({ personId, album, onBack, onChanged, onOpe
               <Icon name={exporting ? "progress_activity" : "download"} className={`text-[18px] ${exporting ? "animate-spin" : ""}`} />
               <span className="hidden sm:inline">{exporting ? "Downloading…" : "Download Face"}</span>
             </button>
-            <span className="p-1.5 rounded-xl border border-outline-variant bg-surface-container text-on-surface-variant opacity-60 cursor-default">
-              <Icon name="more_vert" className="text-[18px]" />
-            </span>
           </div>
         </div>
 
