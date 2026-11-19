@@ -39,13 +39,11 @@ export default function App() {
   const onNav = (key: NavKey) => navigate(key === "all" ? "/all" : `/${key}`);
 
   useEffect(() => {
-    getPersons(false)
-      .then((p) => setCounts((c) => ({ ...c, people: p.length })))
+    getPersons({ limit: 1 })
+      .then((p) => setCounts((c) => ({ ...c, people: p.total })))
       .catch(() => {});
-    getPersons(true)
-      .then((all) =>
-        setCounts((c) => ({ ...c, hidden: all.filter((p) => p.hidden).length }))
-      )
+    getPersons({ hiddenOnly: true, limit: 1 })
+      .then((p) => setCounts((c) => ({ ...c, hidden: p.total })))
       .catch(() => {});
     getSimClusters()
       .then((s) => setCounts((c) => ({ ...c, similar: s.length })))

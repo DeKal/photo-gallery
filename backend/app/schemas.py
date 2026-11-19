@@ -42,6 +42,13 @@ class PersonOut(BaseModel):
     hidden: bool = False
 
 
+class PersonListOut(BaseModel):
+    """A page of the People listing plus the total matching count."""
+
+    total: int
+    items: list[PersonOut]
+
+
 class PhotoOut(BaseModel):
     """A photo in listings (e.g. the photos belonging to a person)."""
 

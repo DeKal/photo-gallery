@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import func, select
+from sqlalchemy import String, and_, cast, func, or_, select
 from sqlalchemy.orm import Session
 
 from app.db import get_session
@@ -12,6 +12,7 @@ from app.schemas import (
     FaceOut,
     MergeRequest,
     MoveFacesRequest,
+    PersonListOut,
     PersonOut,
     PhotoOut,
     RenameRequest,
@@ -90,27 +91,34 @@ def _person_out(
     )
 
 
-@router.get("/persons", response_model=list[PersonOut])
+@router.get("/persons", response_model=PersonListOut)
 def list_persons(
     include_hidden: bool = False,
+    hidden_only: bool = False,
     album: int | None = Query(default=None),
+    q: str | None = Query(default=None),
+    limit: int = Query(default=120, ge=1, le=500),
+    offset: int = Query(default=0, ge=0),
     session: Session = Depends(get_session),
-) -> list[PersonOut]:
-    """List person clusters, ordered by face count descending.
+) -> PersonListOut:
+    """A page of person clusters, named first then by face count descending.
 
-    Hidden (soft-hidden) clusters are excluded unless ``include_hidden`` is set.
-    When ``album`` is given, only persons with at least one face in that album
-    are returned, and their counts/covers are scoped to the album.
+    Hidden clusters are excluded unless ``include_hidden`` is set; ``hidden_only``
+    returns only hidden ones (the Hidden view). ``album`` scopes membership and
+    counts/covers to one album. ``q`` filters by name (or ``person <id>`` / id).
+    ``limit``/``offset`` paginate so the UI loads people in pages like All Photos
+    rather than fetching every cluster at once.
 
-    Built from a fixed set of bulk queries (counts, first-member photos, cover
-    faces) rather than two per person, so it stays fast over a remote DB (Neon)
-    where per-person round-trips would otherwise time out with many clusters.
+    Ordering and slicing happen in SQL so pages are stable across requests; the
+    per-page cover/count lookups then run only for the ids on the page.
     """
-    stmt = select(Person)
-    if not include_hidden:
-        stmt = stmt.where(Person.hidden.is_(False))
+    conds = []
+    if hidden_only:
+        conds.append(Person.hidden.is_(True))
+    elif not include_hidden:
+        conds.append(Person.hidden.is_(False))
     if album is not None:
-        stmt = stmt.where(
+        conds.append(
             Person.id.in_(
                 select(FacePerson.person_id)
                 .join(Face, Face.id == FacePerson.face_id)
@@ -118,25 +126,57 @@ def list_persons(
                 .where(PhotoAlbum.album_id == album)
             )
         )
-    persons = session.execute(stmt).scalars().all()
-    if not persons:
-        return []
-    ids = [p.id for p in persons]
+    if q and q.strip():
+        like = f"%{q.strip()}%"
+        # Named people match on name; unnamed ones match on id or "person <id>"
+        # (mirrors the old client-side filter).
+        conds.append(
+            or_(
+                Person.name.ilike(like),
+                and_(
+                    Person.name.is_(None),
+                    or_(
+                        cast(Person.id, String).ilike(like),
+                        ("person " + cast(Person.id, String)).ilike(like),
+                    ),
+                ),
+            )
+        )
 
-    # Face count per person (album-scoped), one grouped query.
-    cnt_stmt = select(
-        FacePerson.person_id,
-        func.count(func.distinct(FacePerson.face_id)),
-    ).where(FacePerson.person_id.in_(ids))
+    total = session.execute(
+        select(func.count()).select_from(Person).where(*conds)
+    ).scalar_one()
+    if total == 0:
+        return PersonListOut(total=0, items=[])
+
+    # Face count per person (album-scoped), one grouped subquery we both order by
+    # and read the count from — avoids a second pass.
+    cnt_sub = select(
+        FacePerson.person_id.label("pid"),
+        func.count(func.distinct(FacePerson.face_id)).label("cnt"),
+    )
     if album is not None:
-        cnt_stmt = cnt_stmt.join(Face, Face.id == FacePerson.face_id).join(
+        cnt_sub = cnt_sub.join(Face, Face.id == FacePerson.face_id).join(
             PhotoAlbum, PhotoAlbum.photo_id == Face.photo_id
         ).where(PhotoAlbum.album_id == album)
-    counts = dict(
-        session.execute(cnt_stmt.group_by(FacePerson.person_id)).all()
-    )
+    cnt_sub = cnt_sub.group_by(FacePerson.person_id).subquery()
+    cnt_col = func.coalesce(cnt_sub.c.cnt, 0)
 
-    # First member photo per person (album-scoped), one DISTINCT ON query —
+    # Named first (NULL name sorts last), then biggest clusters, then id for a
+    # stable tiebreak across pages.
+    rows = session.execute(
+        select(Person, cnt_col.label("cnt"))
+        .outerjoin(cnt_sub, cnt_sub.c.pid == Person.id)
+        .where(*conds)
+        .order_by(Person.name.is_(None), cnt_col.desc(), Person.id)
+        .limit(limit)
+        .offset(offset)
+    ).all()
+    persons = [r[0] for r in rows]
+    counts = {r[0].id: r[1] for r in rows}
+    ids = [p.id for p in persons]
+
+    # First member photo per page person (album-scoped), one DISTINCT ON query —
     # the fallback cover when no cover face is set (or it falls outside album).
     fm_stmt = (
         select(FacePerson.person_id, Face.photo_id)
@@ -171,7 +211,7 @@ def list_persons(
             ).where(PhotoAlbum.album_id == album)
         cover_photo_of_face = dict(session.execute(cf_stmt).all())
 
-    out = [
+    items = [
         PersonOut(
             id=p.id,
             name=p.name,
@@ -187,8 +227,7 @@ def list_persons(
         )
         for p in persons
     ]
-    out.sort(key=lambda p: p.face_count, reverse=True)
-    return out
+    return PersonListOut(total=total, items=items)
 
 
 def _set_hidden(session: Session, person_id: int, hidden: bool) -> PersonOut:

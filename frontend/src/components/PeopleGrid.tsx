@@ -11,6 +11,9 @@ import { useIsDesktop } from "../useIsDesktop";
 // VITE_READONLY=1) and on mobile, where these destructive actions aren't used.
 const READONLY = import.meta.env.VITE_READONLY === "1";
 
+// People load in pages (infinite scroll) like All Photos, not all at once.
+const PAGE = 120;
+
 const personPlaceholder = (
   <div className="w-full h-full flex items-center justify-center bg-gradient-to-b from-surface-container to-surface text-outline-variant" aria-hidden="true">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" className="w-[38%] h-[38%]">
@@ -53,6 +56,7 @@ export default function PeopleGrid({
   const canCurate = useIsDesktop() && !READONLY;
 
   const [persons, setPersons] = useState<Person[]>([]);
+  const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [internalOpen, setInternalOpen] = useState<number | null>(null);
@@ -65,6 +69,7 @@ export default function PeopleGrid({
   const [busy, setBusy] = useState<Set<number>>(new Set());
   const [density, setDensity] = useState<"comfortable" | "compact">("comfortable");
   const [query, setQuery] = useState("");
+  const [debounced, setDebounced] = useState("");
   // Top-level People can be narrowed to one album; when embedded in album-detail
   // the `album` prop pins it and this picker is hidden.
   const [albums, setAlbums] = useState<Album[]>([]);
@@ -101,22 +106,61 @@ export default function PeopleGrid({
     window.scrollTo(0, target);
   }, [openId]);
 
-  const load = useCallback(() => {
-    setLoading(true);
-    getPersons(hiddenOnly ? true : showHidden, effectiveAlbum)
-      .then((p) => {
-        const list = hiddenOnly ? p.filter((x) => x.hidden) : p;
-        // Named people first (stable — keeps the existing face-count order within each group).
-        setPersons([...list].sort((a, b) => (a.name ? 0 : 1) - (b.name ? 0 : 1)));
-        setError(null);
+  const loadPage = useCallback(
+    (offset: number, q: string, replace: boolean) => {
+      setLoading(true);
+      getPersons({
+        includeHidden: hiddenOnly ? true : showHidden,
+        hiddenOnly,
+        album: effectiveAlbum,
+        q,
+        limit: PAGE,
+        offset,
       })
-      .catch((e) => setError(e instanceof Error ? e.message : String(e)))
-      .finally(() => setLoading(false));
-  }, [showHidden, hiddenOnly, effectiveAlbum]);
+        .then((page) => {
+          setTotal(page.total);
+          setPersons((prev) => (replace ? page.items : [...prev, ...page.items]));
+          setError(null);
+        })
+        .catch((e) => setError(e instanceof Error ? e.message : String(e)))
+        .finally(() => setLoading(false));
+    },
+    [showHidden, hiddenOnly, effectiveAlbum],
+  );
+
+  // Reload from the first page — used after merge/hide and when filters change.
+  const reload = useCallback(() => {
+    setPersons([]);
+    loadPage(0, debounced, true);
+  }, [loadPage, debounced]);
+
+  // Debounce the name filter so each keystroke doesn't hit the API.
+  useEffect(() => {
+    const t = setTimeout(() => setDebounced(query), 250);
+    return () => clearTimeout(t);
+  }, [query]);
 
   useEffect(() => {
-    load();
-  }, [load]);
+    setPersons([]);
+    loadPage(0, debounced, true);
+  }, [debounced, loadPage]);
+
+  const hasMore = persons.length < total;
+
+  // Infinite scroll: fetch the next page when the sentinel scrolls into view.
+  const sentinelRef = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    const el = sentinelRef.current;
+    if (!el || !hasMore || loading) return;
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) loadPage(persons.length, debounced, false);
+      },
+      { rootMargin: "600px" },
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, [hasMore, loading, persons.length, debounced, loadPage]);
 
   // Open a person requested from another view (All Photos chip, etc.). Only in
   // the internal (album-embedded) mode — routed mode opens via the URL.
@@ -144,7 +188,7 @@ export default function PeopleGrid({
     try {
       await mergePersons([...selected]);
       exitSelect();
-      load();
+      reload();
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -160,6 +204,8 @@ export default function PeopleGrid({
       setPersons((prev) =>
         hiddenOnly || !showHidden ? prev.filter((x) => x.id !== p.id) : prev.map((x) => (x.id === p.id ? { ...x, hidden: !x.hidden } : x))
       );
+      // Dropped from this list? Shrink the total so the count/"load more" agree.
+      if (hiddenOnly || !showHidden) setTotal((t) => Math.max(0, t - 1));
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
@@ -177,21 +223,12 @@ export default function PeopleGrid({
         personId={openId}
         album={effectiveAlbum}
         onBack={closePerson}
-        onChanged={load}
+        onChanged={reload}
         onOpenPerson={onOpenPerson}
         onOpenSimilar={onOpenSimilar}
       />
     );
   }
-
-  const q = query.trim().toLowerCase();
-  const visible = q
-    ? persons.filter((p) =>
-        p.name
-          ? p.name.toLowerCase().includes(q)
-          : `person ${p.id}`.includes(q) || String(p.id).includes(q)
-      )
-    : persons;
 
   return (
     <>
@@ -298,14 +335,15 @@ export default function PeopleGrid({
             {error}
           </div>
         )}
-        {loading && <LoadingPill />}
+        {loading && persons.length === 0 && <LoadingPill />}
         {!loading && persons.length === 0 && (
           <div className="text-outline py-12 text-center">
-            {hiddenOnly ? "No hidden people." : "No people yet. Scan a folder to get started."}
+            {debounced
+              ? `No people match “${debounced}”.`
+              : hiddenOnly
+                ? "No hidden people."
+                : "No people yet. Scan a folder to get started."}
           </div>
-        )}
-        {!loading && persons.length > 0 && visible.length === 0 && (
-          <div className="text-outline py-12 text-center">No people match “{query}”.</div>
         )}
 
         <div
@@ -315,7 +353,7 @@ export default function PeopleGrid({
               : "grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 2xl:grid-cols-7"
           }`}
         >
-          {visible.map((p) => {
+          {persons.map((p) => {
             const isSel = selected.has(p.id);
             const unnamed = !p.name;
             return (
@@ -401,6 +439,19 @@ export default function PeopleGrid({
             );
           })}
         </div>
+
+        {hasMore && persons.length > 0 && (
+          <div ref={sentinelRef} className="flex justify-center pt-space-lg">
+            <button
+              onClick={() => loadPage(persons.length, debounced, false)}
+              disabled={loading}
+              className="px-space-lg py-2 rounded-xl bg-[#171922] border border-[#232736] hover:border-primary text-on-surface text-label-md font-label-md flex items-center gap-2 transition-colors disabled:opacity-45"
+            >
+              <Icon name={loading ? "progress_activity" : "expand_more"} className={`text-base ${loading ? "animate-spin" : ""}`} />
+              {loading ? "Loading…" : `Load more (${persons.length} / ${total})`}
+            </button>
+          </div>
+        )}
       </section>
 
       {/* FLOATING STATUS / ACTION DOCK */}

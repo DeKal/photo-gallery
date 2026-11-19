@@ -194,10 +194,30 @@ export function cluster(): Promise<ClusterResult> {
 
 // Persons, similarity and their photos/faces can be scoped to a single album
 // (the album-detail view). Omit the album arg for the global library views.
-export function getPersons(includeHidden = false, album?: number): Promise<Person[]> {
+export interface PersonListPage {
+  total: number;
+  items: Person[];
+}
+
+// Paginated like getPhotos: the UI loads people in pages (limit/offset) and
+// filters by name server-side, rather than fetching every cluster at once.
+export function getPersons(
+  opts: {
+    includeHidden?: boolean;
+    hiddenOnly?: boolean;
+    album?: number;
+    q?: string;
+    limit?: number;
+    offset?: number;
+  } = {},
+): Promise<PersonListPage> {
   const qs = new URLSearchParams();
-  if (includeHidden) qs.set("include_hidden", "true");
-  if (album != null) qs.set("album", String(album));
+  if (opts.includeHidden) qs.set("include_hidden", "true");
+  if (opts.hiddenOnly) qs.set("hidden_only", "true");
+  if (opts.album != null) qs.set("album", String(opts.album));
+  if (opts.q && opts.q.trim()) qs.set("q", opts.q.trim());
+  if (opts.limit != null) qs.set("limit", String(opts.limit));
+  if (opts.offset != null) qs.set("offset", String(opts.offset));
   const s = qs.toString();
   return request(`/persons${s ? `?${s}` : ""}`);
 }
