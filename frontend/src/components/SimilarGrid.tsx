@@ -7,6 +7,7 @@ import {
   getAlbums,
   thumbUrl,
   thumbSources,
+  baseName,
   type Album,
   type SimCluster,
   type Photo,
@@ -117,7 +118,7 @@ export default function SimilarGrid({
   const [openPhoto, setOpenPhoto] = usePhotoParam();
   // The id list + drive ids of whatever panel is on screen, lifted up so the
   // ?photo id can be mapped to a position in the lightbox.
-  const [panel, setPanel] = useState<{ ids: number[]; driveIds: Record<number, string | null> }>({ ids: [], driveIds: {} });
+  const [panel, setPanel] = useState<{ ids: number[]; driveIds: Record<number, string | null>; names: Record<number, string> }>({ ids: [], driveIds: {}, names: {} });
   const [query, setQuery] = useState("");
   // Top-level Similar can be narrowed to one album; when embedded in album-detail
   // the `album` prop pins it and this picker is hidden.
@@ -175,7 +176,7 @@ export default function SimilarGrid({
   // Reset the lifted panel list whenever the on-screen panel changes.
   const viewKey = view.kind === "clusters" ? "clusters" : view.kind === "cluster" ? `c${view.cluster.id}` : `s${view.photoId}`;
   useEffect(() => {
-    setPanel({ ids: [], driveIds: {} });
+    setPanel({ ids: [], driveIds: {}, names: {} });
   }, [viewKey]);
 
   const lbIdx = openPhoto != null ? panel.ids.indexOf(openPhoto) : -1;
@@ -189,6 +190,7 @@ export default function SimilarGrid({
         ids={lbIds}
         index={lbPos}
         driveIds={panel.driveIds}
+        names={panel.names}
         onIndexChange={(i) => setOpenPhoto(lbIds[i] ?? null)}
         onOpenPerson={
           onOpenPerson
@@ -215,7 +217,7 @@ export default function SimilarGrid({
           cluster={view.cluster}
           album={effectiveAlbum}
           onBack={goClusters}
-          onReady={(ids, driveIds) => setPanel({ ids, driveIds })}
+          onReady={(ids, driveIds, names) => setPanel({ ids, driveIds, names })}
           onPick={(id) => setOpenPhoto(id)}
         />
         {lb}
@@ -230,7 +232,7 @@ export default function SimilarGrid({
           photoId={view.photoId}
           album={effectiveAlbum}
           onBack={() => (view.kind === "similar" && view.from ? goCluster(view.from) : goClusters())}
-          onReady={(ids, driveIds) => setPanel({ ids, driveIds })}
+          onReady={(ids, driveIds, names) => setPanel({ ids, driveIds, names })}
           onPick={(id) => setOpenPhoto(id)}
         />
         {lb}
@@ -373,7 +375,7 @@ function ClusterPhotos({
   cluster: SimCluster;
   album?: number;
   onBack: () => void;
-  onReady: (ids: number[], driveIds: Record<number, string | null>) => void;
+  onReady: (ids: number[], driveIds: Record<number, string | null>, names: Record<number, string>) => void;
   onPick: (id: number) => void;
 }) {
   const [photos, setPhotos] = useState<Photo[]>([]);
@@ -388,6 +390,7 @@ function ClusterPhotos({
         onReady(
           p.map((x) => x.id),
           Object.fromEntries(p.map((x) => [x.id, x.drive_file_id ?? null])),
+          Object.fromEntries(p.map((x) => [x.id, baseName(x.path)])),
         );
         setError(null);
       })
@@ -431,7 +434,7 @@ function SimilarPanel({
   photoId: number;
   album?: number;
   onBack: () => void;
-  onReady: (ids: number[], driveIds: Record<number, string | null>) => void;
+  onReady: (ids: number[], driveIds: Record<number, string | null>, names: Record<number, string>) => void;
   onPick: (id: number) => void;
 }) {
   const [results, setResults] = useState<SimilarPhoto[]>([]);
@@ -447,6 +450,7 @@ function SimilarPanel({
         onReady(
           sorted.map((x) => x.photo_id),
           Object.fromEntries(sorted.map((x) => [x.photo_id, x.drive_file_id ?? null])),
+          Object.fromEntries(sorted.map((x) => [x.photo_id, baseName(x.path)])),
         );
         setError(null);
       })

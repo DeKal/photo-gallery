@@ -25,6 +25,8 @@ interface Props {
   // Per-id Google Drive file id (when the photo came from Drive). The viewer
   // shows the Drive image and falls back to the local copy if it fails.
   driveIds?: Record<number, string | null>;
+  // Per-id original filename, so Download saves under the real Drive name.
+  names?: Record<number, string>;
   // Click a person tag to open that person. Omit to hide the tags.
   onOpenPerson?: (id: number) => void;
   // Show a "More like this" action that opens visual-similarity for the photo.
@@ -41,7 +43,7 @@ const MAX_FULL_RETRIES = 4;
 // navigation. Click the backdrop or press Escape to dismiss; ←/→ to page.
 // The same viewer is reused by All Photos, People and Similar — it fetches the
 // photo's people itself so every caller gets identical display + actions.
-export default function Lightbox({ ids, index, onIndexChange, onClose, driveIds, onOpenPerson, onOpenSimilar, canLoadMore, onLoadMore }: Props) {
+export default function Lightbox({ ids, index, onIndexChange, onClose, driveIds, names, onOpenPerson, onOpenSimilar, canLoadMore, onLoadMore }: Props) {
   const count = ids.length;
   const id = ids[index];
   const hasPrev = index > 0;
@@ -187,7 +189,10 @@ export default function Lightbox({ ids, index, onIndexChange, onClose, driveIds,
   // Drive-backed photos are shown from Drive first (index 0) and fall back to
   // the local copy on error — hence the per-image source index state.
   const driveId = driveIds?.[id] ?? null;
-  const fullSrcs = imageSources(id, driveId);
+  // Phones get a lighter 1200px render; desktops the sharper 2000px.
+  const viewW =
+    typeof window !== "undefined" && window.innerWidth < 640 ? 1200 : 2000;
+  const fullSrcs = imageSources(id, driveId, viewW);
   const [fullI, setFullI] = useState(0);
   // Retry cycles after every candidate fails — Drive rate-limits (429) full
   // images under a burst; back off and retry rather than hang on the spinner.
@@ -211,10 +216,10 @@ export default function Lightbox({ ids, index, onIndexChange, onClose, driveIds,
       if (nid != null) {
         const img = new Image();
         img.referrerPolicy = "no-referrer";
-        img.src = imageSources(nid, driveIds?.[nid] ?? null)[0];
+        img.src = imageSources(nid, driveIds?.[nid] ?? null, viewW)[0];
       }
     }
-  }, [ids, index, driveIds]);
+  }, [ids, index, driveIds, viewW]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -233,7 +238,7 @@ export default function Lightbox({ ids, index, onIndexChange, onClose, driveIds,
     <div
       data-testid="lightbox"
       onClick={onClose}
-      className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-[#0b0d12]/90 backdrop-blur-lg cursor-zoom-out"
+      className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-[#0b0d12]/90 backdrop-blur-lg"
     >
       {/* Top-right controls: star, prominent download, close. */}
       <div className="fixed top-4 right-4 z-10 flex items-center gap-2">
@@ -258,7 +263,7 @@ export default function Lightbox({ ids, index, onIndexChange, onClose, driveIds,
           data-testid="lightbox-download"
           onClick={(e) => {
             e.stopPropagation();
-            void downloadPhoto(id, driveId);
+            void downloadPhoto(id, driveId, names?.[id]);
           }}
           title="Download photo"
           className="h-10 w-10 justify-center px-0 sm:w-auto sm:px-space-md sm:justify-start rounded-full bg-gradient-to-r from-indigo-500 to-violet-600 hover:opacity-90 text-white font-label-md text-label-md shadow-lg shadow-indigo-500/30 active:scale-[0.98] transition-all flex items-center gap-2"
@@ -353,7 +358,7 @@ export default function Lightbox({ ids, index, onIndexChange, onClose, driveIds,
       )}
 
       <div className="relative flex flex-col items-center cursor-default" onClick={(e) => e.stopPropagation()}>
-        <div className="relative h-[86vh] flex items-center justify-center">
+        <div className="relative h-[70vh] sm:h-[86vh] flex items-center justify-center">
           {/* Single image: Drive first (index 0), local copy on error. A spinner
               covers the gap until it decodes — no separate thumbnail request. */}
           <img
@@ -401,7 +406,7 @@ export default function Lightbox({ ids, index, onIndexChange, onClose, driveIds,
             </button>
           )}
         </div>
-        <div className="absolute top-full left-1/2 -translate-x-1/2 w-[94vw] flex flex-col items-center gap-3">
+        <div className="absolute top-full left-1/2 -translate-x-1/2 w-[94vw] max-h-[22vh] sm:max-h-[12vh] overflow-y-auto custom-scroll flex flex-col items-center gap-3">
           {note && (
             <div className="text-label-sm font-label-sm text-emerald-400 flex items-center gap-1.5">
               <Icon name="check_circle" className="text-base" />

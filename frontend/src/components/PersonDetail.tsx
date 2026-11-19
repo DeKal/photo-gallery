@@ -8,6 +8,7 @@ import {
   renamePerson,
   faceThumbUrl,
   thumbSources,
+  baseName,
   type Person,
   type Photo,
   type Face,
@@ -424,6 +425,7 @@ export default function PersonDetail({ personId, album, onBack, onChanged, onOpe
             onIndexChange={(i) => setOpenPhoto(pid[i] ?? null)}
             onClose={() => setOpenPhoto(null)}
             driveIds={Object.fromEntries(photos.map((p) => [p.id, p.drive_file_id ?? null]))}
+            names={Object.fromEntries(photos.map((p) => [p.id, baseName(p.path)]))}
             onOpenPerson={
               onOpenPerson
                 ? (p) => {

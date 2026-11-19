@@ -109,6 +109,7 @@ class SimilarPhoto(BaseModel):
 
     photo_id: int
     distance: float
+    path: Optional[str] = None
     thumb_path: Optional[str] = None
     drive_file_id: Optional[str] = None
 

@@ -60,6 +60,7 @@ export interface SimCluster {
 export interface SimilarPhoto {
   photo_id: number;
   distance: number;
+  path?: string | null;
   thumb_path: string | null;
   drive_file_id?: string | null;
 }
@@ -106,12 +107,18 @@ export function imageUrl(photoId: number): string {
 // normal share link (drive.google.com/file/d/ID/view) is an HTML page and will
 // not embed.
 
-export function driveThumbUrl(fileId: string, size = 1000): string {
+export function driveThumbUrl(fileId: string, size = 500): string {
   return `https://drive.google.com/thumbnail?id=${fileId}&sz=w${size}`;
 }
 
 export function driveImageUrl(fileId: string, size = 2000): string {
   return `https://lh3.googleusercontent.com/d/${fileId}=w${size}`;
+}
+
+// Full-resolution original (no downscale) — used for Download, not display.
+// `=s0` asks Drive for the image at its original dimensions.
+export function driveOriginalUrl(fileId: string): string {
+  return `https://lh3.googleusercontent.com/d/${fileId}=s0`;
 }
 
 // Candidate sources for ImgWithFallback / the lightbox: Drive first (when the
@@ -129,22 +136,45 @@ export function thumbSources(
 export function imageSources(
   photoId: number,
   driveFileId?: string | null,
+  size = 2000,
 ): string[] {
   return driveFileId
-    ? [driveImageUrl(driveFileId), imageUrl(photoId)]
+    ? [driveImageUrl(driveFileId, size), imageUrl(photoId)]
     : [imageUrl(photoId)];
+}
+
+// Sources for the Download action: a ~2MB Drive render (w2048) first, then the
+// local stored original as fallback. Larger than the display render but capped
+// so downloads aren't the full ~20MB original.
+export function downloadSources(
+  photoId: number,
+  driveFileId?: string | null,
+): string[] {
+  return driveFileId
+    ? [driveImageUrl(driveFileId, 2048), imageUrl(photoId)]
+    : [imageUrl(photoId)];
+}
+
+// The Drive/original filename for a photo, derived from its stored path (which
+// every listing already returns) — so downloads save under the real name
+// without an extra request.
+export function baseName(path?: string | null): string {
+  if (!path) return "";
+  return path.split(/[\\/]/).pop() || "";
 }
 
 // Download the full-resolution photo to the user's disk. Tries each candidate
 // source in turn, fetching the bytes and saving them via a temporary <a>. Drive
 // (lh3.googleusercontent.com) may block cross-origin fetches with CORS; if every
 // source fails we open the first URL in a new tab so the user can save it
-// manually.
+// manually. `name` (the original Drive filename) is used as the saved filename.
 export async function downloadPhoto(
   photoId: number,
   driveFileId?: string | null,
+  name?: string | null,
 ): Promise<void> {
-  const srcs = imageSources(photoId, driveFileId);
+  const filename = name || `photo-${photoId}.jpg`;
+  const srcs = downloadSources(photoId, driveFileId);
   for (const src of srcs) {
     try {
       const res = await fetch(src, { referrerPolicy: "no-referrer" });
@@ -153,7 +183,7 @@ export async function downloadPhoto(
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `photo-${photoId}.jpg`;
+      a.download = filename;
       document.body.appendChild(a);
       a.click();
       a.remove();

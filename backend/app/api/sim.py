@@ -139,6 +139,7 @@ def similar_photos(
         select(
             ImageEmbedding.photo_id,
             distance,
+            Photo.path,
             Photo.thumb_path,
             Photo.drive_file_id,
         )
@@ -155,8 +156,9 @@ def similar_photos(
         SimilarPhoto(
             photo_id=pid,
             distance=float(dist),
+            path=path,
             thumb_path=thumb_path,
             drive_file_id=drive_file_id,
         )
-        for pid, dist, thumb_path, drive_file_id in rows
+        for pid, dist, path, thumb_path, drive_file_id in rows
     ]

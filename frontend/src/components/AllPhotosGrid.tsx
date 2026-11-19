@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { getPhotos, getAlbums, removePhotosFromAlbum, setAlbumCover, thumbSources, type Album, type PhotoListItem, type PhotoOrder } from "../api";
+import { getPhotos, getAlbums, removePhotosFromAlbum, setAlbumCover, thumbSources, baseName, type Album, type PhotoListItem, type PhotoOrder } from "../api";
 import { usePhotoParam } from "../useRouteState";
 import ImgWithFallback from "./ImgWithFallback";
 import Lightbox from "./Lightbox";
@@ -159,6 +159,12 @@ export default function AllPhotosGrid({
   const driveIds = useMemo(() => {
     const m: Record<number, string | null> = {};
     for (const p of items) m[p.id] = p.drive_file_id ?? null;
+    return m;
+  }, [items]);
+  // Per-id original filename (from path) so a download saves under the real name.
+  const names = useMemo(() => {
+    const m: Record<number, string> = {};
+    for (const p of items) m[p.id] = baseName(p.path);
     return m;
   }, [items]);
 
@@ -375,6 +381,7 @@ export default function AllPhotosGrid({
             onIndexChange={(i) => setOpenPhoto(lbIds[i] ?? null)}
             onClose={() => setOpenPhoto(null)}
             driveIds={driveIds}
+            names={names}
             canLoadMore={inList && hasMore && !loading}
             onLoadMore={() => loadPage(items.length, order, debounced, false)}
             onOpenPerson={
