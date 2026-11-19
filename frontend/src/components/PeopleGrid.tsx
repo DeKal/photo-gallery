@@ -375,21 +375,21 @@ export default function PeopleGrid({
 
                 {/* Label footer — sits below the image so the gradient/text
                     never covers the face. */}
-                <div className="px-4 py-3 flex flex-col justify-end">
+                <div className="px-3 py-2 flex flex-col justify-end">
                   {unnamed ? (
                     <>
-                      <h3 className="text-body-md md:text-headline-sm font-headline-sm font-semibold text-on-surface tracking-tight truncate">Unnamed (Person {p.id})</h3>
-                      <p className="text-body-sm font-body-sm text-primary mt-0.5 truncate">
+                      <h3 className="text-body-sm md:text-body-lg font-headline-sm font-semibold text-on-surface tracking-tight truncate">Unnamed (Person {p.id})</h3>
+                      <p className="text-label-sm font-label-sm text-primary mt-0.5 truncate">
                         {p.face_count} {p.face_count === 1 ? "face" : "faces"} • Click to label
                       </p>
                     </>
                   ) : (
                     <>
-                      <div className="flex items-center justify-between">
-                        <h3 className="text-body-md md:text-headline-sm font-headline-sm font-bold text-white tracking-tight truncate">{p.name}</h3>
-                        <Icon name="verified" className="text-indigo-400 text-sm shrink-0" />
+                      <div className="flex items-center justify-between gap-1">
+                        <h3 className="text-body-sm md:text-body-lg font-headline-sm font-bold text-white tracking-tight truncate">{p.name}</h3>
+                        <Icon name="verified" className="text-indigo-400 text-xs shrink-0" />
                       </div>
-                      <p className="text-body-sm font-body-sm text-outline mt-0.5">
+                      <p className="text-label-sm font-label-sm text-outline mt-0.5">
                         {p.face_count} {p.face_count === 1 ? "face" : "faces"}
                         {p.hidden ? " • hidden" : ""}
                       </p>
