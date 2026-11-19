@@ -36,6 +36,23 @@ app = FastAPI()
 app.mount("/api", api_app)
 
 
+def _fetch_shell(host: str) -> str | None:
+    """Fetch the built SPA index.html from the frontend service (same origin).
+
+    Vercel routes /index.html to the frontend static build, so this never loops
+    back into the backend.
+    """
+    try:
+        req = urllib.request.Request(
+            f"https://{host}/index.html",
+            headers={"User-Agent": "spa-shell"},
+        )
+        with urllib.request.urlopen(req, timeout=5) as r:  # noqa: S310 (same-origin)
+            return r.read().decode("utf-8")
+    except Exception:
+        return None
+
+
 def _set_meta(doc: str, prop: str, value: str, attr: str = "property") -> str:
     """Replace a <meta …>'s content, or insert the tag before </head>.
 
@@ -63,14 +80,8 @@ def album_og(album_id: int, request: Request) -> HTMLResponse:
     to the app home rather than 500 a shared link.
     """
     host = request.headers.get("host", "")
-    try:
-        req = urllib.request.Request(
-            f"https://{host}/index.html",
-            headers={"User-Agent": "og-prerender"},
-        )
-        with urllib.request.urlopen(req, timeout=5) as r:  # noqa: S310 (same-origin)
-            doc = r.read().decode("utf-8")
-    except Exception:
+    doc = _fetch_shell(host)
+    if doc is None:
         return RedirectResponse(url="/", status_code=307)
 
     name = f"Album {album_id}"
@@ -119,4 +130,21 @@ def album_og(album_id: int, request: Request) -> HTMLResponse:
     doc = _set_meta(doc, "twitter:title", title, attr="name")
     doc = _set_meta(doc, "twitter:description", desc, attr="name")
     doc = _set_meta(doc, "twitter:image", _html.escape(image), attr="name")
+    return HTMLResponse(content=doc)
+
+
+@app.get("/{full_path:path}", response_class=HTMLResponse)
+def spa_shell(full_path: str, request: Request) -> HTMLResponse:
+    """SPA deep-link fallback: serve index.html for any client route.
+
+    The frontend is a static build with no catch-all, so a direct load of
+    /all, /people/5, etc. 404s on the static host. Vercel routes those paths
+    here (assets, /index.html and static root files are peeled off to the
+    frontend first); we return the SPA shell unchanged so React Router renders
+    the route. No DB work — this stays fast and never wakes Neon.
+    """
+    host = request.headers.get("host", "")
+    doc = _fetch_shell(host)
+    if doc is None:
+        return RedirectResponse(url="/index.html", status_code=307)
     return HTMLResponse(content=doc)

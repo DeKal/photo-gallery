@@ -13,7 +13,12 @@
   },
   "rewrites": [
     { "source": "/api/(.*)", "destination": { "service": "backend" } },
-    { "source": "/albums/(.+)", "destination": { "service": "backend" } },
-    { "source": "/(.*)", "destination": { "service": "frontend" } }
+    { "source": "/assets/(.*)", "destination": { "service": "frontend" } },
+    { "source": "/index.html", "destination": { "service": "frontend" } },
+    { "source": "/icon.png", "destination": { "service": "frontend" } },
+    { "source": "/og-image.png", "destination": { "service": "frontend" } },
+    { "source": "/favicon.ico", "destination": { "service": "frontend" } },
+    { "source": "/", "destination": { "service": "frontend" } },
+    { "source": "/(.*)", "destination": { "service": "backend" } }
   ]
 }
