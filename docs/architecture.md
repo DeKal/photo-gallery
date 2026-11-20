@@ -77,6 +77,25 @@ in `vercel.json` rewrites plus the backend routes in `app.vercel_app`. Keeping t
 API under `/api` (frontend `VITE_API_BASE=/api`) is what frees the root paths for
 client routes.
 
+## Auth
+
+The public deploy is **browse-only for anonymous visitors**; curation and the
+worker functions require a signed-in **admin**. A single admin account lives in
+the `users` table (seed with `scripts/seed_admin.py`); the password is stored only
+as a PBKDF2-SHA256 hash. `POST /api/auth/login` verifies it and returns an
+HMAC-SHA256-signed token (subject + 30-day expiry) keyed by `PHOTO_AUTH_SECRET` —
+no server-side session store, which suits the stateless serverless API. All of
+this is **stdlib only** (`hashlib`/`hmac`/`secrets`), so the slim image gains no
+dependency.
+
+Enforcement is on the **backend**, not just the UI: every mutating route (person
+hide/rename/merge, face move, album create/edit/add, favorite, and the worker's
+scan/cluster/pick-folder) declares `Depends(require_admin)` and returns 401
+without a valid `Authorization: Bearer <token>`. Read routes stay public. The
+frontend mirrors this cosmetically — `useAuth()` exposes `isAdmin`, the API client
+attaches the token (kept in `localStorage`, validated on load via `/auth/me`), and
+admin-only controls are hidden when logged out.
+
 ## Data model
 
 ```mermaid
@@ -148,6 +167,11 @@ erDiagram
     photo_album {
         int photo_id PK "FK to photos"
         int album_id PK "FK to albums"
+    }
+    users {
+        int id PK
+        text username UK
+        text password_hash
     }
 ```
 

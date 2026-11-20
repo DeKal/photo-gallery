@@ -1,5 +1,7 @@
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import Icon from "./Icon";
+import LoginDialog from "./LoginDialog";
+import { useAuth } from "../auth";
 
 export type NavKey = "all" | "people" | "similar" | "hidden" | "albums";
 
@@ -31,6 +33,8 @@ const NAV: { key: NavKey; label: string; icon: string }[] = [
 // footer links are decorative (as in the mock); refresh + Scan/Import are wired.
 export default function AppShell({ nav, onNav, onImportFolder, children }: Props) {
   const peopleActive = nav === "people" || nav === "hidden";
+  const { isAdmin, username, logout } = useAuth();
+  const [showLogin, setShowLogin] = useState(false);
 
   return (
     <div className="min-h-screen flex flex-col font-body-md overflow-x-hidden">
@@ -53,8 +57,35 @@ export default function AppShell({ nav, onNav, onImportFolder, children }: Props
               </p>
             </div>
           </div>
+
+          {/* Auth control */}
+          {isAdmin ? (
+            <div className="flex items-center gap-space-sm">
+              <span className="hidden sm:flex items-center gap-1.5 text-label-md font-label-md text-on-surface-variant">
+                <Icon name="shield_person" className="text-lg text-primary" />
+                {username}
+              </span>
+              <button
+                onClick={logout}
+                className="flex items-center gap-1.5 h-9 px-space-md rounded-xl bg-surface-container hover:bg-surface-container-high border border-outline-variant text-on-surface-variant hover:text-on-surface text-label-md font-label-md transition-colors"
+              >
+                <Icon name="logout" className="text-lg" />
+                <span className="hidden sm:inline">Sign out</span>
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => setShowLogin(true)}
+              className="flex items-center gap-1.5 h-9 px-space-md rounded-xl bg-surface-container hover:bg-surface-container-high border border-outline-variant text-on-surface-variant hover:text-on-surface text-label-md font-label-md transition-colors"
+            >
+              <Icon name="lock" className="text-lg" />
+              <span className="hidden sm:inline">Sign in</span>
+            </button>
+          )}
         </div>
       </header>
+
+      {showLogin && <LoginDialog onClose={() => setShowLogin(false)} />}
 
       {/* SIDE NAV + CONTENT */}
       <div className="flex-1 flex overflow-hidden">

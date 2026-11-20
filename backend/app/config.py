@@ -14,6 +14,10 @@ class Settings(BaseSettings):
     # (e.g. Vercel). Each invocation is short-lived and the DB (Neon) pools
     # connections itself, so the app must NOT keep its own connection pool.
     serverless: bool = False
+    # Secret key for signing session tokens (app/auth.py). MUST be overridden in
+    # any real deployment via PHOTO_AUTH_SECRET -- the default is dev-only and
+    # anyone who knows it can forge an admin token.
+    auth_secret: str = "dev-insecure-change-me"
 
     def model_post_init(self, __context) -> None:
         if self.thumb_dir is None:

@@ -17,6 +17,20 @@ class ScanRequest(BaseModel):
     album_name: Optional[str] = None
 
 
+class LoginRequest(BaseModel):
+    """Request body for ``POST /auth/login``."""
+
+    username: str
+    password: str
+
+
+class TokenOut(BaseModel):
+    """Issued session token plus the authenticated username."""
+
+    token: str
+    username: str
+
+
 class ScanStatus(BaseModel):
     """Progress snapshot of a scan, serialized from the ``Scan`` ORM row."""
 

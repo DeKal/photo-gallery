@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import { BrowserRouter } from "react-router-dom";
 import { HelmetProvider } from "react-helmet-async";
 import App from "./App";
+import { AuthProvider } from "./auth";
 import "./index.css";
 
 // Web fonts cause FOUT: Material Symbols render their ligature NAME as text, and
@@ -24,9 +25,11 @@ setTimeout(revealFonts, 3000);
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <HelmetProvider>
-      <BrowserRouter>
-        <App />
-      </BrowserRouter>
+      <AuthProvider>
+        <BrowserRouter>
+          <App />
+        </BrowserRouter>
+      </AuthProvider>
     </HelmetProvider>
   </StrictMode>,
 );

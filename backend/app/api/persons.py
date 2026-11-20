@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import String, and_, cast, func, or_, select
 from sqlalchemy.orm import Session
 
+from app.auth import require_admin
 from app.db import get_session
 from app.models import Face, FacePerson, Person, Photo, PhotoAlbum
 from app.schemas import (
@@ -243,7 +244,9 @@ def _set_hidden(session: Session, person_id: int, hidden: bool) -> PersonOut:
 
 @router.post("/persons/{person_id}/hide", response_model=PersonOut)
 def hide_person(
-    person_id: int, session: Session = Depends(get_session)
+    person_id: int,
+    session: Session = Depends(get_session),
+    _: str = Depends(require_admin),
 ) -> PersonOut:
     """Soft-hide a person cluster (e.g. a bad classification)."""
     return _set_hidden(session, person_id, True)
@@ -251,7 +254,9 @@ def hide_person(
 
 @router.post("/persons/{person_id}/unhide", response_model=PersonOut)
 def unhide_person(
-    person_id: int, session: Session = Depends(get_session)
+    person_id: int,
+    session: Session = Depends(get_session),
+    _: str = Depends(require_admin),
 ) -> PersonOut:
     """Restore a previously hidden person cluster."""
     return _set_hidden(session, person_id, False)
@@ -354,6 +359,7 @@ def set_person_cover(
     person_id: int,
     body: SetCoverRequest,
     session: Session = Depends(get_session),
+    _: str = Depends(require_admin),
 ) -> PersonOut:
     """Set the person's cover face to one of its member faces."""
     person = session.get(Person, person_id)
@@ -378,6 +384,7 @@ def rename_person(
     person_id: int,
     body: RenameRequest,
     session: Session = Depends(get_session),
+    _: str = Depends(require_admin),
 ) -> PersonOut:
     """Set a person's name."""
     person = session.get(Person, person_id)
@@ -393,7 +400,9 @@ def rename_person(
 
 @router.post("/persons/merge", response_model=PersonOut)
 def merge_persons(
-    body: MergeRequest, session: Session = Depends(get_session)
+    body: MergeRequest,
+    session: Session = Depends(get_session),
+    _: str = Depends(require_admin),
 ) -> PersonOut:
     """Merge all person clusters in ``ids`` into the first id."""
     if len(body.ids) < 2:
@@ -443,7 +452,9 @@ def merge_persons(
 
 @router.post("/faces/move")
 def move_faces(
-    body: MoveFacesRequest, session: Session = Depends(get_session)
+    body: MoveFacesRequest,
+    session: Session = Depends(get_session),
+    _: str = Depends(require_admin),
 ) -> dict[str, object]:
     """Reassign faces to an existing person, or to a freshly created one."""
     if body.person_id is not None:

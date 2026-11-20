@@ -9,6 +9,36 @@
 export const BASE: string =
   (import.meta.env.VITE_API_BASE as string | undefined) ?? "/api";
 
+// ---- Auth token ----------------------------------------------------------
+// The admin session token (from POST /auth/login) is kept in localStorage and
+// attached as a Bearer header to every request. Anonymous visitors have no
+// token and so can only reach the public (read) endpoints.
+const TOKEN_KEY = "photo_auth_token";
+
+export function getToken(): string | null {
+  try {
+    return localStorage.getItem(TOKEN_KEY);
+  } catch {
+    return null;
+  }
+}
+
+export function setToken(token: string): void {
+  try {
+    localStorage.setItem(TOKEN_KEY, token);
+  } catch {
+    // Private-mode / storage-disabled: session just won't persist a reload.
+  }
+}
+
+export function clearToken(): void {
+  try {
+    localStorage.removeItem(TOKEN_KEY);
+  } catch {
+    // ignore
+  }
+}
+
 // ---- Types ---------------------------------------------------------------
 
 export type ScanStatus = "pending" | "running" | "downloading" | "completed" | "failed";
@@ -74,9 +104,14 @@ export interface FaceMoveResult {
 // ---- Low-level helpers ---------------------------------------------------
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
+  const token = getToken();
   const res = await fetch(`${BASE}${path}`, {
-    headers: { "Content-Type": "application/json" },
     ...init,
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...init?.headers,
+    },
   });
   if (!res.ok) {
     const body = await res.text().catch(() => "");
@@ -85,6 +120,19 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   // Some endpoints may return empty bodies.
   const text = await res.text();
   return (text ? JSON.parse(text) : undefined) as T;
+}
+
+// ---- Auth ----------------------------------------------------------------
+
+export function login(username: string, password: string): Promise<{ token: string; username: string }> {
+  return request("/auth/login", {
+    method: "POST",
+    body: JSON.stringify({ username, password }),
+  });
+}
+
+export function getMe(): Promise<{ username: string }> {
+  return request("/auth/me");
 }
 
 // ---- Media URL helpers ---------------------------------------------------

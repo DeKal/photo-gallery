@@ -5,6 +5,7 @@ import ImgWithFallback from "./ImgWithFallback";
 import Lightbox from "./Lightbox";
 import LoadingPill from "./LoadingPill";
 import Icon from "./Icon";
+import { useAuth } from "../auth";
 
 const PAGE = 120;
 
@@ -50,6 +51,7 @@ export default function AllPhotosGrid({
   // Back button + album title, so the grid drops its own (keeps count + search).
   embedded?: boolean;
 }) {
+  const { isAdmin } = useAuth();
   const [items, setItems] = useState<PhotoListItem[]>([]);
   const [total, setTotal] = useState(0);
   const [order, setOrder] = useState<PhotoOrder>("newest");
@@ -309,7 +311,7 @@ export default function AllPhotosGrid({
                     alt={p.path}
                     placeholder={photoPlaceholder}
                   />
-                  {album && (
+                  {album && isAdmin && (
                     <>
                       <button
                         onClick={(e) => {

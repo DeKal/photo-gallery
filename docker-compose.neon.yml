@@ -15,6 +15,9 @@ services:
   api:
     environment:
       PHOTO_DATABASE_URL: ${PHOTO_DATABASE_URL_NEON:?set PHOTO_DATABASE_URL_NEON in ./.env}
+      # Signs admin session tokens (app/auth.py). Set PHOTO_AUTH_SECRET in ./.env
+      # to match the Vercel deploy; defaults to the dev-only key if unset.
+      PHOTO_AUTH_SECRET: ${PHOTO_AUTH_SECRET:-dev-insecure-change-me}
     depends_on: []
 
   frontend:

@@ -6,10 +6,7 @@ import PersonDetail from "./PersonDetail";
 import LoadingPill from "./LoadingPill";
 import Icon from "./Icon";
 import { useIsDesktop } from "../useIsDesktop";
-
-// Curation (select/merge, hide) is disabled on read-only deploys (Vercel sets
-// VITE_READONLY=1) and on mobile, where these destructive actions aren't used.
-const READONLY = import.meta.env.VITE_READONLY === "1";
+import { useAuth } from "../auth";
 
 // People load in pages (infinite scroll) like All Photos, not all at once.
 const PAGE = 120;
@@ -57,8 +54,9 @@ export default function PeopleGrid({
   // between them never remounts this component — the loaded pages just stay.
   const routedPersonId = routed && params["*"] ? Number(params["*"]) : null;
 
-  // Select/merge + hide are shown only on desktop and only when not read-only.
-  const canCurate = useIsDesktop() && !READONLY;
+  // Select/merge + hide are shown only on desktop and only to a signed-in admin.
+  const { isAdmin } = useAuth();
+  const canCurate = useIsDesktop() && isAdmin;
 
   const [persons, setPersons] = useState<Person[]>([]);
   const [total, setTotal] = useState(0);

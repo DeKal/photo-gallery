@@ -15,6 +15,7 @@ import {
 } from "../api";
 import Icon from "./Icon";
 import AlbumDialog from "./AlbumDialog";
+import { useAuth } from "../auth";
 
 interface Props {
   // Ordered list of photo ids the viewer can page through.
@@ -44,6 +45,7 @@ const MAX_FULL_RETRIES = 4;
 // The same viewer is reused by All Photos, People and Similar — it fetches the
 // photo's people itself so every caller gets identical display + actions.
 export default function Lightbox({ ids, index, onIndexChange, onClose, driveIds, names, onOpenPerson, onOpenSimilar, canLoadMore, onLoadMore }: Props) {
+  const { isAdmin } = useAuth();
   const count = ids.length;
   const id = ids[index];
   const hasPrev = index > 0;
@@ -263,6 +265,7 @@ export default function Lightbox({ ids, index, onIndexChange, onClose, driveIds,
     >
       {/* Top-right controls: star, prominent download, close. */}
       <div className="fixed top-4 right-4 z-10 flex items-center gap-2">
+        {isAdmin && (
         <button
           data-testid="lightbox-favorite-top"
           aria-pressed={favorite}
@@ -280,6 +283,7 @@ export default function Lightbox({ ids, index, onIndexChange, onClose, driveIds,
           <Icon name={favorite ? "star" : "star_border"} className="text-base" />
           <span className="hidden sm:inline">{favorite ? "Starred" : "Star"}</span>
         </button>
+        )}
         <button
           data-testid="lightbox-download"
           onClick={(e) => {
@@ -302,6 +306,7 @@ export default function Lightbox({ ids, index, onIndexChange, onClose, driveIds,
       </div>
 
       {/* Add to album — top-left, menu opens downward. */}
+      {isAdmin && (
       <div className="fixed top-4 left-4 z-10" onClick={(e) => e.stopPropagation()}>
         <button
           data-testid="lightbox-add-album"
@@ -348,6 +353,7 @@ export default function Lightbox({ ids, index, onIndexChange, onClose, driveIds,
           </div>
         )}
       </div>
+      )}
 
       {/* Prev */}
       {hasPrev && (

@@ -9,6 +9,7 @@ import sys
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from sqlalchemy.orm import Session
 
+from app.auth import require_admin
 from app.db import get_session
 from app.drive import is_drive_url
 from app.models import Scan
@@ -23,6 +24,7 @@ def start_scan(
     body: ScanRequest,
     background_tasks: BackgroundTasks,
     session: Session = Depends(get_session),
+    _: str = Depends(require_admin),
 ) -> dict[str, int]:
     """Create a scan for ``root_path`` and run the pipeline in the background.
 
@@ -67,7 +69,7 @@ def get_scan(scan_id: int, session: Session = Depends(get_session)) -> Scan:
 
 
 @router.get("/pick-folder")
-def pick_folder() -> dict[str, str | None]:
+def pick_folder(_: str = Depends(require_admin)) -> dict[str, str | None]:
     """Open a native folder picker on the host and return the chosen path.
 
     The backend runs natively on the user's machine, so it can pop the OS

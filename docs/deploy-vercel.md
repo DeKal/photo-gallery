@@ -51,6 +51,27 @@ psql "$NEON_DIRECT_URL" -c "SELECT
 
 `photos.dump` is gitignored; delete it when done.
 
+## 2b. Create the admin account
+
+Curation and the worker functions are admin-only (every mutating endpoint
+requires a valid token; anonymous visitors browse read-only). The admin lives in
+a `users` table — add it, then seed the account. Use the Neon **direct**
+(non-pooled) URL:
+
+```bash
+# Add the users table (not in older dumps).
+psql "$NEON_DIRECT_URL" -f backend/sql/007_add_users.sql
+
+# Seed the admin (password stored only as a PBKDF2 hash; pick your own).
+cd backend && PHOTO_DATABASE_URL="$NEON_DIRECT_URL" \
+  .venv/bin/python ../scripts/seed_admin.py --username admin --password 'YOUR_PASSWORD'
+```
+
+Re-running `seed_admin.py` with the same username updates that account's
+password. Tokens are signed with `PHOTO_AUTH_SECRET` (set in step 4) — the seeded
+password and the secret are independent; changing the secret logs everyone out
+but does not change the password.
+
 ## 3. Import the project into Vercel
 
 1. In Vercel, **Add New → Project** and import the repository.
@@ -76,6 +97,7 @@ In the Vercel project: **Settings → Environment Variables**. Add these for the
 | Variable | Value | Notes |
 |---|---|---|
 | `PHOTO_DATABASE_URL` | Neon **pooled** connection string | Must be the `-pooler` host, `?sslmode=require`. Runtime DB connection. |
+| `PHOTO_AUTH_SECRET` | a long random string | Signs admin session tokens (`app/auth.py`). Keep it secret and stable; rotating it invalidates existing logins. Generate e.g. `python -c "import secrets; print(secrets.token_urlsafe(48))"`. |
 | `VITE_NO_WORKER` | `1` | Build-time flag that hides the scan/import UI. Must be set **before** the build. |
 
 `PHOTO_SERVERLESS` does not need to be set — `app.vercel_app` forces it on so the
@@ -113,6 +135,12 @@ curl -s -o /dev/null -w "%{http_code} %{content_type}\n" \
 curl -s -o /dev/null -w "%{http_code}\n" https://<your-app>.vercel.app/all        # 200
 curl -s https://<your-app>.vercel.app/albums/1 \
   | grep -iE '<title>|og:title|og:image'                 # album name + cover URL
+
+# Auth: login issues a token; writes are rejected without one.
+curl -s https://<your-app>.vercel.app/api/auth/login -H 'Content-Type: application/json' \
+     -d '{"username":"admin","password":"YOUR_PASSWORD"}'      # {"token":...}
+curl -s -o /dev/null -w "%{http_code}\n" -X POST \
+     https://<your-app>.vercel.app/api/persons/1/hide          # 401 (no token)
 ```
 
 ## Updating the data later

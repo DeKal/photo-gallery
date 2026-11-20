@@ -131,6 +131,26 @@ Scanning is **idempotent** (photos are keyed by content SHA-256), so re-scanning
 a folder is safe and only processes new files. Re-clustering preserves the names
 you've assigned.
 
+## Admin & permissions
+
+Browsing is open; **curation and the worker functions (scan, folder import, hide/
+unhide, album create/edit/add, favorite) require a signed-in admin**. Enforcement
+is on the backend — every mutating endpoint needs a valid token — with the UI
+hiding those controls when logged out. The admin account lives in the DB; seed it
+once (password is stored only as a PBKDF2 hash):
+
+```bash
+# Create the users table, then seed the account (choose your own password).
+docker compose exec -T db psql -U photo -d photos < backend/sql/007_add_users.sql
+cd backend && PHOTO_DATABASE_URL=postgresql+psycopg://photo:photo@localhost:5432/photos \
+  .venv/bin/python ../scripts/seed_admin.py --username admin --password 'YOUR_PASSWORD'
+```
+
+Set `PHOTO_AUTH_SECRET` (any long random string) wherever the API runs to sign
+session tokens; it defaults to a dev-only key otherwise. Then use **Sign in** in
+the app's top bar. See [`docs/deploy-vercel.md`](docs/deploy-vercel.md) for the
+Neon/Vercel equivalent.
+
 ## Tests
 
 The suite is end-to-end against the real backend, real Postgres and real models

@@ -18,6 +18,7 @@ import Lightbox from "./Lightbox";
 import LoadingPill from "./LoadingPill";
 import { usePhotoParam } from "../useRouteState";
 import Icon from "./Icon";
+import { useAuth } from "../auth";
 
 interface Props {
   personId: number;
@@ -61,6 +62,7 @@ const photoPlaceholder = (
 // controls from the mock (Export Face Crops, Filter by Date, search, sort,
 // density, meta tags) are shown inert to match the layout.
 export default function PersonDetail({ personId, album, onBack, onChanged, onOpenPerson, onOpenSimilar }: Props) {
+  const { isAdmin } = useAuth();
   const [person, setPerson] = useState<Person | null>(null);
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [faces, setFaces] = useState<Face[]>([]);
@@ -243,6 +245,7 @@ export default function PersonDetail({ personId, album, onBack, onChanged, onOpe
                   </div>
 
                   {/* Inline rename */}
+                  {isAdmin && (
                   <div className="flex items-center gap-space-sm pt-1">
                     <div className="relative flex-1 min-w-0 max-w-sm">
                       <input
@@ -266,10 +269,11 @@ export default function PersonDetail({ personId, album, onBack, onChanged, onOpe
                       {saving ? "Saving…" : "Save"}
                     </button>
                   </div>
+                  )}
 
                   {/* Lazy cover-face picker toggle — faces are fetched only on
                       first open so the page paints without waiting for them. */}
-                  {person.face_count > 1 && (
+                  {isAdmin && person.face_count > 1 && (
                     <button
                       data-testid="toggle-faces"
                       onClick={toggleFaces}

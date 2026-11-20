@@ -8,10 +8,12 @@ import AllPhotosGrid from "./components/AllPhotosGrid";
 import AlbumsGrid from "./components/AlbumsGrid";
 import Icon from "./components/Icon";
 import { getPersons, getSimClusters, getPhotos, getAlbums, pickFolder } from "./api";
+import { useAuth } from "./auth";
 
 // Prod deploys (e.g. Vercel) have no ML worker, so scanning and folder import
 // are unavailable. VITE_NO_WORKER=1 hides that UI; browsing + curation (which
-// hit the DB-only API and still write) stay available.
+// hit the DB-only API and still write) stay available. Beyond that, the
+// scan/import surface is also admin-only (worker functions are gated).
 const NO_WORKER = import.meta.env.VITE_NO_WORKER === "1";
 
 // Map the current hash path to a top-nav key for AppShell highlighting.
@@ -27,6 +29,11 @@ export default function App() {
   const navigate = useNavigate();
   const location = useLocation();
   const nav = navForPath(location.pathname);
+  const { isAdmin } = useAuth();
+
+  // Worker-backed actions (scan, folder import) require both a deployed worker
+  // and an authenticated admin.
+  const showWorker = !NO_WORKER && isAdmin;
 
   const [refreshKey, setRefreshKey] = useState(0);
   const [scanPath, setScanPath] = useState("");
@@ -74,17 +81,17 @@ export default function App() {
   const showScanHeader = nav === "people" || nav === "similar" || nav === "hidden";
 
   return (
-    <AppShell nav={nav} onNav={onNav} onImportFolder={NO_WORKER ? undefined : importFolder} counts={counts}>
+    <AppShell nav={nav} onNav={onNav} onImportFolder={showWorker ? importFolder : undefined} counts={counts}>
       {showScanHeader && (
         <section className="p-space-lg lg:px-margin-lg lg:pt-space-xl border-b border-outline-variant/60 bg-[#111318]/70 backdrop-blur-md">
-          {!NO_WORKER && (
+          {showWorker && (
             <div className="hidden md:block">
               <ScanBar onClustered={reload} path={scanPath} onPathChange={setScanPath} />
             </div>
           )}
 
           {/* Segmented mode switch: People vs Similar */}
-          <div className={`flex items-center justify-between ${NO_WORKER ? "" : "md:mt-space-lg md:border-t md:border-outline-variant/40 md:pt-space-md"}`}>
+          <div className={`flex items-center justify-between ${showWorker ? "md:mt-space-lg md:border-t md:border-outline-variant/40 md:pt-space-md" : ""}`}>
             <div className="flex items-center gap-space-md">
               {peopleActive && (
                 <>
@@ -115,7 +122,7 @@ export default function App() {
         </section>
       )}
 
-      {nav === "all" && !NO_WORKER && (
+      {nav === "all" && showWorker && (
         <section className="hidden md:block p-space-lg lg:px-margin-lg lg:pt-space-xl border-b border-outline-variant/60 bg-[#111318]/70 backdrop-blur-md">
           <ScanBar onClustered={reload} path={scanPath} onPathChange={setScanPath} />
         </section>

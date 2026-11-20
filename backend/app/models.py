@@ -147,3 +147,18 @@ class PhotoAlbum(Base):
     album_id: Mapped[int] = mapped_column(
         ForeignKey("albums.id"), primary_key=True
     )
+
+
+class User(Base):
+    """A login account. Only the admin is seeded (scripts/seed_admin.py).
+
+    ``password_hash`` holds a PBKDF2-SHA256 digest (see app/auth.py); the
+    plaintext password is never stored.
+    """
+
+    __tablename__ = "users"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    username: Mapped[str] = mapped_column(String, unique=True, nullable=False)
+    password_hash: Mapped[str] = mapped_column(String, nullable=False)
+    created_at: Mapped[datetime | None] = mapped_column(nullable=True)
