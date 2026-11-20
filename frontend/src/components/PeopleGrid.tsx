@@ -57,6 +57,7 @@ export default function PeopleGrid({
   // Select/merge + hide are shown only on desktop and only to users who may
   // curate people (hide/merge share the same access tier).
   const canCurate = useIsDesktop() && useCan("personHide");
+  const canShowHidden = useCan("personShowHidden");
 
   const [persons, setPersons] = useState<Person[]>([]);
   const [total, setTotal] = useState(0);
@@ -321,7 +322,7 @@ export default function PeopleGrid({
           </div>
           {/* Row 2 (mobile): show-hidden left, reload + density right */}
           <div className="flex items-center gap-space-sm">
-            {!hiddenOnly && (
+            {!hiddenOnly && canShowHidden && (
               <label className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[#171922] border border-[#232736] cursor-pointer hover:border-outline-variant">
                 <input className="sr-only peer" type="checkbox" checked={showHidden} onChange={() => setShowHidden((v) => !v)} />
                 <div className="w-8 h-4 bg-surface-container peer-checked:bg-indigo-600 rounded-full transition-colors relative">

@@ -21,6 +21,7 @@ REQUIRES_ADMIN: dict[str, bool] = {
     "pick_folder": True,
     # People curation
     "person.hide": True,
+    "person.show_hidden": True,
     "person.rename": True,
     "person.merge": True,
     "person.cover": False,  # cover face is a safe, display-only pick
@@ -50,3 +51,8 @@ def gate(capability: str) -> Callable:
     default to admin-only (fail closed).
     """
     return require_admin if REQUIRES_ADMIN.get(capability, True) else _allow_anon
+
+
+def requires_admin(capability: str) -> bool:
+    """Whether a capability needs admin. Unknown capabilities fail closed."""
+    return REQUIRES_ADMIN.get(capability, True)

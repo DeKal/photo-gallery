@@ -30,6 +30,7 @@ export default function App() {
   const location = useLocation();
   const nav = navForPath(location.pathname);
   const canScan = useCan("scan");
+  const canShowHidden = useCan("personShowHidden");
 
   // Worker-backed actions (scan, folder import) require both a deployed worker
   // and the matching permission.
@@ -49,9 +50,11 @@ export default function App() {
     getPersons({ limit: 1 })
       .then((p) => setCounts((c) => ({ ...c, people: p.total })))
       .catch(() => {});
-    getPersons({ hiddenOnly: true, limit: 1 })
-      .then((p) => setCounts((c) => ({ ...c, hidden: p.total })))
-      .catch(() => {});
+    if (canShowHidden) {
+      getPersons({ hiddenOnly: true, limit: 1 })
+        .then((p) => setCounts((c) => ({ ...c, hidden: p.total })))
+        .catch(() => {});
+    }
     getSimClusters()
       .then((s) => setCounts((c) => ({ ...c, similar: s.length })))
       .catch(() => {});
@@ -61,7 +64,7 @@ export default function App() {
     getAlbums()
       .then((a) => setCounts((c) => ({ ...c, albums: a.length })))
       .catch(() => {});
-  }, [refreshKey]);
+  }, [refreshKey, canShowHidden]);
 
   const importFolder = async () => {
     try {
@@ -140,7 +143,13 @@ export default function App() {
         />
         <Route
           path="/hidden"
-          element={<PeopleGrid key={`hidden-${refreshKey}`} routed hiddenOnly initialShowHidden onOpenPerson={openPerson} onOpenSimilar={openSimilar} />}
+          element={
+            canShowHidden ? (
+              <PeopleGrid key={`hidden-${refreshKey}`} routed hiddenOnly initialShowHidden onOpenPerson={openPerson} onOpenSimilar={openSimilar} />
+            ) : (
+              <Navigate to="/people" replace />
+            )
+          }
         />
         <Route
           path="/similar"

@@ -9,6 +9,7 @@ export const REQUIRES_ADMIN = {
   pickFolder: true,
   // People curation
   personHide: true,
+  personShowHidden: true,
   personRename: true,
   personMerge: true,
   personCover: false, // cover face is a safe, display-only pick

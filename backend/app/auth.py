@@ -119,3 +119,15 @@ def require_admin(authorization: str | None = Header(default=None)) -> str:
     if sub is None:
         raise HTTPException(status_code=401, detail="Invalid or expired token")
     return sub
+
+
+def optional_admin(authorization: str | None = Header(default=None)) -> str | None:
+    """Like ``require_admin`` but never raises: returns the username or None.
+
+    For read routes whose access depends on a query flag (e.g. listing hidden
+    people), so the handler can decide per request.
+    """
+    if not authorization or not authorization.lower().startswith("bearer "):
+        return None
+    return verify_token(authorization[7:].strip())
+

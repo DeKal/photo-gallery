@@ -6,8 +6,9 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import String, and_, cast, func, or_, select
 from sqlalchemy.orm import Session
 
+from app.auth import optional_admin
 from app.db import get_session
-from app.permissions import gate
+from app.permissions import gate, requires_admin
 from app.models import Face, FacePerson, Person, Photo, PhotoAlbum
 from app.schemas import (
     FaceOut,
@@ -101,6 +102,7 @@ def list_persons(
     limit: int = Query(default=120, ge=1, le=500),
     offset: int = Query(default=0, ge=0),
     session: Session = Depends(get_session),
+    viewer: str | None = Depends(optional_admin),
 ) -> PersonListOut:
     """A page of person clusters, named first then by face count descending.
 
@@ -113,6 +115,11 @@ def list_persons(
     Ordering and slicing happen in SQL so pages are stable across requests; the
     per-page cover/count lookups then run only for the ids on the page.
     """
+    # Seeing hidden people is a gated capability: block the request (not just the
+    # UI) when it is admin-only and the caller is not a signed-in admin.
+    if (include_hidden or hidden_only) and requires_admin("person.show_hidden") and viewer is None:
+        raise HTTPException(status_code=401, detail="Not authenticated")
+
     conds = []
     if hidden_only:
         conds.append(Person.hidden.is_(True))

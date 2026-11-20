@@ -88,21 +88,23 @@ no server-side session store, which suits the stateless serverless API. All of
 this is **stdlib only** (`hashlib`/`hmac`/`secrets`), so the slim image gains no
 dependency.
 
-Enforcement is on the **backend**, not just the UI: every mutating route (person
-hide/rename/merge, face move, album create/edit/add, favorite, and the worker's
-scan/cluster/pick-folder) declares `Depends(gate("<capability>"))` and returns
-401 without a valid `Authorization: Bearer <token>`. Read routes stay public. The
-frontend mirrors this cosmetically — `useCan("<capability>")` hides the matching
-control when access is denied, the API client attaches the token (kept in
-`localStorage`, validated on load via `/auth/me`).
+Enforcement is on the **backend**, not just the UI: mutating routes (person
+hide/rename/merge, viewing hidden people, face move, album create/edit/add, and
+the worker's scan/cluster/pick-folder) declare `Depends(gate("<capability>"))`
+and return 401 without a valid `Authorization: Bearer <token>`. Read routes stay
+public (the one exception: listing hidden people is gated inside the handler,
+since it's a flag on the public `/persons` read). The frontend mirrors this
+cosmetically — `useCan("<capability>")` hides the matching control when access is
+denied, the API client attaches the token (kept in `localStorage`, validated on
+load via `/auth/me`).
 
 Which capabilities require admin lives in **one place per side** —
 `backend/app/permissions.py` (`REQUIRES_ADMIN` + the `gate()` dependency factory)
 and `frontend/src/permissions.ts` (mirrored map, read by `useCan`). Flipping a
 capability to `False` opens it to anonymous visitors on both the API and the UI
-in a single edit; it fails closed (unknown capability ⇒ admin-only). For example
-`person.cover` (choosing a cover face) ships open — a safe, display-only pick —
-while everything else is admin-only.
+in a single edit; it fails closed (unknown capability ⇒ admin-only). Two safe,
+display-only picks ship open — `person.cover` (choosing a cover face) and
+`photo.favorite` (starring a photo) — while everything else is admin-only.
 
 ## Data model
 
