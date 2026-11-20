@@ -81,6 +81,31 @@ class PhotoPerson(BaseModel):
     name: Optional[str] = None
 
 
+class PhotoFace(BaseModel):
+    """One detected face box in a photo, for position tags in the viewer.
+
+    ``bbox`` is ``[x1, y1, x2, y2]`` in the photo's original pixel coordinates
+    (measured against :attr:`PhotoFacesOut.width`/``height``), so the UI can
+    place the box as a percentage of the displayed image. ``person_id`` is set
+    only when the face clustered into a (non-hidden) person; unassigned faces
+    carry a box but no link. ``id`` is the face row id, so the viewer can detach
+    a mis-tagged face from its person.
+    """
+
+    id: int
+    bbox: list[float]
+    person_id: Optional[int] = None
+    person_name: Optional[str] = None
+
+
+class PhotoFacesOut(BaseModel):
+    """Face boxes for a single photo plus the dims the boxes are measured in."""
+
+    width: Optional[int] = None
+    height: Optional[int] = None
+    faces: list[PhotoFace] = []
+
+
 class PhotoListItem(BaseModel):
     """A photo in the flat All-Photos library listing, with light EXIF."""
 
@@ -164,6 +189,16 @@ class MoveFacesRequest(BaseModel):
 
     face_ids: list[int]
     person_id: Optional[int] = None
+
+
+class DetachFacesRequest(BaseModel):
+    """Request body for ``POST /faces/detach``: unassign faces from any person.
+
+    Used to correct a mis-tag — the listed faces are removed from whatever
+    person they were on and left unassigned (not moved to a new person).
+    """
+
+    face_ids: list[int]
 
 
 class AlbumOut(BaseModel):

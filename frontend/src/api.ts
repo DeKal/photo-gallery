@@ -428,6 +428,37 @@ export function getPhotoPersons(photoId: number): Promise<PhotoPerson[]> {
   return request(`/photos/${photoId}/persons`);
 }
 
+// One detected face box in a photo. `bbox` is [x1,y1,x2,y2] in the photo's
+// original pixel coords (measured against PhotoFaces.width/height), so the
+// viewer can place it as a percentage over the displayed image. `person_id`
+// is set only for faces that clustered into a non-hidden person (clickable).
+export interface PhotoFace {
+  id: number;
+  bbox: number[];
+  person_id: number | null;
+  person_name: string | null;
+}
+
+export interface PhotoFaces {
+  width: number | null;
+  height: number | null;
+  faces: PhotoFace[];
+}
+
+// Face boxes for one photo, for position tags in the lightbox.
+export function getPhotoFaces(photoId: number): Promise<PhotoFaces> {
+  return request(`/photos/${photoId}/faces`);
+}
+
+// Detach faces from whatever person they're on (mis-tag correction): the faces
+// become unassigned, not moved to a new person.
+export function detachFaces(faceIds: number[]): Promise<{ detached: number }> {
+  return request(`/faces/detach`, {
+    method: "POST",
+    body: JSON.stringify({ face_ids: faceIds }),
+  });
+}
+
 // Favorite (star) state of a single photo, and a setter. The lightbox fetches
 // the state when a photo opens and toggles it with the star button.
 export function getPhotoFavorite(photoId: number): Promise<{ id: number; favorite: boolean }> {

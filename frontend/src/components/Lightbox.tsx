@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import {
   imageSources,
-  getPhotoPersons,
+  getPhotoFaces,
+  detachFaces,
   getPhotoFavorite,
   setPhotoFavorite,
   downloadPhoto,
@@ -10,7 +11,7 @@ import {
   createAlbum,
   addPhotosToAlbum,
   removePhotosFromAlbum,
-  type PhotoPerson,
+  type PhotoFaces,
   type Album,
 } from "../api";
 import Icon from "./Icon";
@@ -47,6 +48,7 @@ const MAX_FULL_RETRIES = 4;
 export default function Lightbox({ ids, index, onIndexChange, onClose, driveIds, names, onOpenPerson, onOpenSimilar, canLoadMore, onLoadMore }: Props) {
   const canFavorite = useCan("photoFavorite");
   const canAddToAlbum = useCan("albumAddPhoto");
+  const canMoveFaces = useCan("faceMove");
   const count = ids.length;
   const id = ids[index];
   const hasPrev = index > 0;
@@ -91,19 +93,23 @@ export default function Lightbox({ ids, index, onIndexChange, onClose, driveIds,
     }
   }, [count, wantNext, index, onIndexChange]);
 
-  // Who is in this photo (named first). Fetched per-id so the viewer is
-  // self-contained no matter which screen opened it.
-  const [persons, setPersons] = useState<PhotoPerson[]>([]);
+  // Face boxes for the current photo (positions + who each face is), for the
+  // position-tag overlay. Fetched per-id like the people list. Hovering a face
+  // always reveals its box; the Tags button (`showAllTags`) pins every box
+  // visible at once. Resets to hover-only for each new photo.
+  const [faceData, setFaceData] = useState<PhotoFaces | null>(null);
+  const [showAllTags, setShowAllTags] = useState(false);
   useEffect(() => {
     if (id == null) return;
     let alive = true;
-    setPersons([]);
-    getPhotoPersons(id)
-      .then((p) => {
-        if (alive) setPersons(p);
+    setFaceData(null);
+    setShowAllTags(false);
+    getPhotoFaces(id)
+      .then((f) => {
+        if (alive) setFaceData(f);
       })
       .catch(() => {
-        if (alive) setPersons([]);
+        if (alive) setFaceData(null);
       });
     return () => {
       alive = false;
@@ -159,6 +165,23 @@ export default function Lightbox({ ids, index, onIndexChange, onClose, driveIds,
     setNote(msg);
     if (noteTimer.current) window.clearTimeout(noteTimer.current);
     noteTimer.current = window.setTimeout(() => setNote(null), 2000);
+  };
+
+  // Remove a mis-tagged face from its person: drop the box optimistically and
+  // call the backend; on failure, refetch to restore the true state.
+  const detachFace = async (faceId: number) => {
+    setFaceData((d) =>
+      d ? { ...d, faces: d.faces.filter((x) => x.id !== faceId) } : d,
+    );
+    try {
+      await detachFaces([faceId]);
+      flash("Face removed");
+    } catch {
+      flash("Could not remove face");
+      getPhotoFaces(id)
+        .then(setFaceData)
+        .catch(() => {});
+    }
   };
 
   const toggleAlbumMenu = async () => {
@@ -266,6 +289,25 @@ export default function Lightbox({ ids, index, onIndexChange, onClose, driveIds,
     >
       {/* Top-right controls: star, prominent download, close. */}
       <div className="fixed top-4 right-4 z-10 flex items-center gap-2">
+        {onOpenPerson && (
+            <button
+              data-testid="lightbox-toggle-boxes"
+              aria-pressed={showAllTags}
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowAllTags((v) => !v);
+              }}
+              title={showAllTags ? "Hide tags (hover still shows)" : "Show all face tags"}
+              className={`h-10 w-10 justify-center px-0 sm:w-auto sm:px-space-md sm:justify-start rounded-full backdrop-blur-md border font-label-md text-label-md active:scale-[0.98] transition-all flex items-center gap-2 ${
+                showAllTags
+                  ? "bg-indigo-400/15 border-indigo-400/40 text-indigo-300 hover:text-indigo-200"
+                  : "bg-[#171922]/80 border-white/10 text-on-surface hover:text-white hover:border-white/30"
+              }`}
+            >
+              <Icon name="frame_person" className="text-base" />
+              <span className="hidden sm:inline">Tags</span>
+            </button>
+          )}
         {canFavorite && (
         <button
           data-testid="lightbox-favorite-top"
@@ -388,7 +430,10 @@ export default function Lightbox({ ids, index, onIndexChange, onClose, driveIds,
       <div className="relative flex flex-col items-center cursor-default" onClick={(e) => e.stopPropagation()} onTouchStart={onTouchStart} onTouchEnd={onTouchEnd}>
         <div className="relative h-[70vh] sm:h-[86vh] flex items-center justify-center">
           {/* Single image: Drive first (index 0), local copy on error. A spinner
-              covers the gap until it decodes — no separate thumbnail request. */}
+              covers the gap until it decodes — no separate thumbnail request.
+              Wrapped in an inline box that shrinks to the rendered image so the
+              face-tag overlay can be positioned as a percentage of it. */}
+          <div className="relative inline-flex h-full items-center">
           <img
             key={`full-${id}`}
             src={(() => {
@@ -414,6 +459,88 @@ export default function Lightbox({ ids, index, onIndexChange, onClose, driveIds,
             }`}
             style={{ boxShadow: "0 24px 60px -12px rgba(0,0,0,0.7), 0 0 40px rgba(99,102,241,0.15)" }}
           />
+          {/* Face-tag overlay: a hover target per detected face, placed as a
+              percentage of the original image dims. Each box + name chip is
+              hidden until the cursor is over that face (default), or pinned
+              visible for all faces when the Tags button is on (`showAllTags`).
+              Named faces are a clickable button (opens the person); unassigned
+              faces get a dashed box only. Mounted once the image has loaded so
+              it lines up. */}
+          {onOpenPerson &&
+            loaded &&
+            faceData &&
+            !!faceData.width &&
+            !!faceData.height && (
+              <div className="absolute inset-0 pointer-events-none">
+                {faceData.faces.map((f, i) => {
+                  const W = faceData.width as number;
+                  const H = faceData.height as number;
+                  const [bx1, by1, bx2, by2] = f.bbox;
+                  const rawW = (Math.abs(bx2 - bx1) / W) * 100;
+                  const rawH = (Math.abs(by2 - by1) / H) * 100;
+                  // Pad the box a bit beyond the tight face bbox so it frames
+                  // the head rather than cropping it (15% of the box on each
+                  // side), clamped to the image bounds.
+                  const padX = rawW * 0.15;
+                  const padY = rawH * 0.15;
+                  const left = Math.max(0, (Math.min(bx1, bx2) / W) * 100 - padX);
+                  const top = Math.max(0, (Math.min(by1, by2) / H) * 100 - padY);
+                  const w = Math.min(100 - left, rawW + 2 * padX);
+                  const h = Math.min(100 - top, rawH + 2 * padY);
+                  const pos = { left: `${left}%`, top: `${top}%`, width: `${w}%`, height: `${h}%` };
+                  const named = f.person_id != null;
+                  const label = f.person_name ?? (named ? `Person ${f.person_id}` : null);
+                  // Hover reveals the tag by default; the Tags button pins all on.
+                  const vis = showAllTags ? "opacity-100" : "opacity-0 group-hover:opacity-100";
+                  // Facebook-style: no box — just a name tag (with a caret)
+                  // under the face. Unnamed faces show nothing.
+                  if (!named) return null;
+                  return (
+                    <div key={i} className="group absolute" style={pos}>
+                      {/* Invisible hover target over the face reveals its tag. */}
+                      <button
+                        data-testid="lightbox-face-tag"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onOpenPerson(f.person_id as number);
+                        }}
+                        aria-label={`Open ${label}`}
+                        className="absolute inset-0 pointer-events-auto cursor-pointer"
+                      />
+                      {/* Name tag + caret, centered just under the face. */}
+                      <div className={`absolute left-1/2 top-full -translate-x-1/2 mt-1 flex flex-col items-center transition-opacity ${vis}`}>
+                        <span className="h-2 w-2 -mb-1 rotate-45 bg-black/75" />
+                        <span className="pointer-events-auto flex items-center gap-1 max-w-[46vw] rounded-lg bg-black/75 backdrop-blur-sm px-2.5 py-1 text-white text-label-md font-label-md shadow-lg ring-1 ring-white/10">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onOpenPerson(f.person_id as number);
+                            }}
+                            className="truncate cursor-pointer hover:underline"
+                          >
+                            {label}
+                          </button>
+                          {canMoveFaces && (
+                            <button
+                              data-testid="lightbox-face-remove"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                void detachFace(f.id);
+                              }}
+                              title="Remove this face from the person"
+                              className="shrink-0 ml-0.5 -mr-1 h-4 w-4 rounded-full flex items-center justify-center text-white/70 hover:text-white hover:bg-white/15"
+                            >
+                              <Icon name="close" className="text-[13px]" />
+                            </button>
+                          )}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
           {!loaded && (
             <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
               <Icon name="progress_activity" className="text-3xl text-white/80 animate-spin" />
@@ -434,30 +561,12 @@ export default function Lightbox({ ids, index, onIndexChange, onClose, driveIds,
             </button>
           )}
         </div>
-        <div className="absolute top-full left-1/2 -translate-x-1/2 w-[94vw] max-h-[22vh] sm:max-h-[12vh] overflow-y-auto custom-scroll flex flex-col items-center gap-3">
-          {note && (
-            <div className="text-label-sm font-label-sm text-emerald-400 flex items-center gap-1.5">
-              <Icon name="check_circle" className="text-base" />
-              {note}
-            </div>
-          )}
-          {onOpenPerson && persons.length > 0 && (
-            <div className="flex flex-wrap items-center justify-center gap-2 max-w-[90vw]">
-              {persons.map((pp) => (
-                <button
-                  key={pp.id}
-                  data-testid="lightbox-person"
-                  onClick={() => onOpenPerson(pp.id)}
-                  title={`Open ${pp.name ?? `Person ${pp.id}`}`}
-                  className="flex items-center gap-1.5 pl-2 pr-3 py-1 rounded-full bg-[#171922]/90 border border-white/10 hover:border-indigo-400 text-on-surface hover:text-white text-label-md font-label-md transition-colors"
-                >
-                  <Icon name={pp.name ? "person" : "person_outline"} className="text-[16px] text-primary" />
-                  {pp.name ?? `Person ${pp.id}`}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
+        {note && (
+          <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[110] flex items-center gap-2 rounded-full bg-[#171922]/95 backdrop-blur-md border border-white/10 px-4 py-2 text-white text-label-md font-label-md shadow-2xl">
+            <Icon name="check_circle" className="text-base text-emerald-400" />
+            {note}
+          </div>
+        )}
       </div>
 
       {newAlbumOpen && (

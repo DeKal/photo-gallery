@@ -15,6 +15,8 @@ from app.models import Face, FacePerson, Person, Photo, PhotoAlbum
 from app.schemas import (
     FavoriteOut,
     FavoriteRequest,
+    PhotoFace,
+    PhotoFacesOut,
     PhotoListItem,
     PhotoListOut,
     PhotoPerson,
@@ -158,6 +160,51 @@ def photo_persons(
     persons = [PhotoPerson(id=pid, name=name) for pid, name in rows]
     persons.sort(key=lambda x: (x.name is None, x.name or "", x.id))
     return persons
+
+
+@router.get("/photos/{photo_id}/faces", response_model=PhotoFacesOut)
+def photo_faces(
+    photo_id: int, session: Session = Depends(get_session)
+) -> PhotoFacesOut:
+    """Detected face boxes in a single photo, for position tags in the viewer.
+
+    Returns each face's ``bbox`` (original pixel coords) plus the photo's
+    ``width``/``height`` so the UI can place the box as a percentage over the
+    displayed image. A face that clustered into a non-hidden person carries that
+    ``person_id``/``person_name`` (clickable); unassigned faces carry a box with
+    no link. Faces belonging to a hidden person are omitted entirely, matching
+    the person-tag listing.
+    """
+    photo = session.get(Photo, photo_id)
+    if photo is None:
+        raise HTTPException(status_code=404, detail="photo not found")
+
+    # Faces pinned to a hidden person are suppressed (the user hid that person).
+    hidden_face_ids = (
+        select(FacePerson.face_id)
+        .join(Person, Person.id == FacePerson.person_id)
+        .where(Person.hidden.is_(True))
+    )
+    rows = session.execute(
+        select(Face.id, Face.bbox, Person.id, Person.name)
+        .select_from(Face)
+        .outerjoin(FacePerson, FacePerson.face_id == Face.id)
+        .outerjoin(Person, Person.id == FacePerson.person_id)
+        .where(Face.photo_id == photo_id, Face.id.not_in(hidden_face_ids))
+        .order_by(Face.id)
+    ).all()
+
+    faces = [
+        PhotoFace(
+            id=fid,
+            bbox=[float(v) for v in bbox],
+            person_id=pid,
+            person_name=name,
+        )
+        for fid, bbox, pid, name in rows
+        if bbox is not None and len(bbox) >= 4
+    ]
+    return PhotoFacesOut(width=photo.width, height=photo.height, faces=faces)
 
 
 @router.get("/photos/{photo_id}/favorite", response_model=FavoriteOut)

@@ -11,6 +11,7 @@ from app.db import get_session
 from app.permissions import gate, requires_admin
 from app.models import Face, FacePerson, Person, Photo, PhotoAlbum
 from app.schemas import (
+    DetachFacesRequest,
     FaceOut,
     MergeRequest,
     MoveFacesRequest,
@@ -519,3 +520,62 @@ def move_faces(
         "person_id": target.id,
         "emptied_named_persons": emptied_named,
     }
+
+
+@router.post("/faces/detach")
+def detach_faces(
+    body: DetachFacesRequest,
+    session: Session = Depends(get_session),
+    _: str = Depends(gate("face.move")),
+) -> dict[str, object]:
+    """Unassign faces from whatever person they are on (mis-tag correction).
+
+    Deletes the ``FacePerson`` link for each face, leaving it unassigned (it
+    does not move to a new person). Any now-empty *unnamed* auto person is
+    cleaned up; named persons are kept (and reported) even if emptied, since a
+    user curated them. Does not unlock the persons the faces came from.
+    """
+    # Persons that might become empty once these faces are detached.
+    source_ids = {
+        row
+        for row in session.execute(
+            select(FacePerson.person_id).where(
+                FacePerson.face_id.in_(body.face_ids)
+            )
+        ).scalars()
+    }
+
+    detached = session.execute(
+        FacePerson.__table__.delete().where(
+            FacePerson.face_id.in_(body.face_ids)
+        )
+    ).rowcount
+    session.flush()
+
+    emptied_named: list[int] = []
+    detached_set = set(body.face_ids)
+    for source_id in source_ids:
+        if _face_count(session, source_id) > 0:
+            source = session.get(Person, source_id)
+            # If the detached face was this person's cover, repoint the cover
+            # to a face it still has so the card doesn't show a removed face.
+            if source is not None and source.cover_face_id in detached_set:
+                replacement = session.execute(
+                    select(FacePerson.face_id)
+                    .where(FacePerson.person_id == source_id)
+                    .limit(1)
+                ).scalar_one_or_none()
+                source.cover_face_id = replacement
+            continue
+        source = session.get(Person, source_id)
+        if source is None:
+            continue
+        if source.name is None:
+            source.cover_face_id = None
+            session.delete(source)
+        else:
+            emptied_named.append(source_id)
+
+    session.commit()
+    return {"detached": int(detached), "emptied_named_persons": emptied_named}
+
