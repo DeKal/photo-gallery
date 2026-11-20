@@ -103,7 +103,6 @@ export default function Lightbox({ ids, index, onIndexChange, onClose, driveIds,
     if (id == null) return;
     let alive = true;
     setFaceData(null);
-    setShowAllTags(false);
     getPhotoFaces(id)
       .then((f) => {
         if (alive) setFaceData(f);
@@ -246,6 +245,22 @@ export default function Lightbox({ ids, index, onIndexChange, onClose, driveIds,
   const [fullRetry, setFullRetry] = useState(0);
   const [loaded, setLoaded] = useState(false);
   const fullTimer = useRef<number | null>(null);
+  // Rendered size of the <img> element. The image is object-contain with a
+  // max-width cap, so on phones a wide photo is letterboxed *inside* the
+  // element (element height != image height). The face overlay must line up
+  // with the visible image, not the element box, so we measure the element and
+  // compute the contained image rect from the photo aspect (faceData dims).
+  const imgRef = useRef<HTMLImageElement>(null);
+  const [imgRect, setImgRect] = useState<{ w: number; h: number } | null>(null);
+  useEffect(() => {
+    const el = imgRef.current;
+    if (!el) return;
+    const update = () => setImgRect({ w: el.clientWidth, h: el.clientHeight });
+    update();
+    const ro = new ResizeObserver(update);
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [loaded, id]);
   useEffect(() => {
     setLoaded(false);
     setFullI(0);
@@ -436,6 +451,7 @@ export default function Lightbox({ ids, index, onIndexChange, onClose, driveIds,
           <div className="relative inline-flex h-full items-center">
           <img
             key={`full-${id}`}
+            ref={imgRef}
             src={(() => {
               const b = fullSrcs[Math.min(fullI, fullSrcs.length - 1)];
               return fullRetry > 0 ? `${b}${b.includes("?") ? "&" : "?"}retry=${fullRetry}` : b;
@@ -470,8 +486,26 @@ export default function Lightbox({ ids, index, onIndexChange, onClose, driveIds,
             loaded &&
             faceData &&
             !!faceData.width &&
-            !!faceData.height && (
-              <div className="absolute inset-0 pointer-events-none">
+            !!faceData.height &&
+            imgRect && (
+              <div
+                className="absolute pointer-events-none"
+                style={(() => {
+                  // Contained image rect inside the element (letterbox offsets).
+                  const scale = Math.min(
+                    imgRect.w / (faceData.width as number),
+                    imgRect.h / (faceData.height as number),
+                  );
+                  const dispW = (faceData.width as number) * scale;
+                  const dispH = (faceData.height as number) * scale;
+                  return {
+                    left: (imgRect.w - dispW) / 2,
+                    top: (imgRect.h - dispH) / 2,
+                    width: dispW,
+                    height: dispH,
+                  };
+                })()}
+              >
                 {faceData.faces.map((f, i) => {
                   const W = faceData.width as number;
                   const H = faceData.height as number;
@@ -510,7 +544,7 @@ export default function Lightbox({ ids, index, onIndexChange, onClose, driveIds,
                       {/* Name tag + caret, centered just under the face. */}
                       <div className={`absolute left-1/2 top-full -translate-x-1/2 mt-1 flex flex-col items-center transition-opacity ${vis}`}>
                         <span className="h-2 w-2 -mb-1 rotate-45 bg-black/75" />
-                        <span className="pointer-events-auto flex items-center gap-1 max-w-[46vw] rounded-lg bg-black/75 backdrop-blur-sm px-2.5 py-1 text-white text-label-md font-label-md shadow-lg ring-1 ring-white/10">
+                        <span className="pointer-events-auto flex items-center gap-1 max-w-[46vw] rounded-lg bg-black/75 backdrop-blur-sm px-3 py-1.5 text-white text-body-lg font-label-md shadow-lg ring-1 ring-white/10">
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
