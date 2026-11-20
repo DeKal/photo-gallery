@@ -53,7 +53,11 @@ MIN_SAMPLES = 1
 # apart while absorbing pose/lighting variation of one person. If a single
 # cluster ends up with a clearly-too-large share, drop to 0.34.
 FACE_EPS = 0.38
-FACE_MIN_SAMPLES = 3
+# Min faces (incl. the point itself) within FACE_EPS to seed a person cluster.
+# At 3 a guest appearing in only 2 photos was dropped as noise; 2 lets a
+# two-appearance person form a cluster (a lone single-appearance face still
+# stays unassigned, which is inherent to DBSCAN at min_samples >= 2).
+FACE_MIN_SAMPLES = 2
 # Detections weaker/smaller than these pollute clusters, so they are excluded
 # from clustering (and left unassigned to any person).
 MIN_DET_SCORE = 0.5
