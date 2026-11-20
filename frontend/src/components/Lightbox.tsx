@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type MouseEvent } from "react";
 import {
   imageSources,
   getPhotoFaces,
@@ -17,6 +17,7 @@ import {
 import Icon from "./Icon";
 import AlbumDialog from "./AlbumDialog";
 import { useCan } from "../auth";
+import { useIsDesktop } from "../useIsDesktop";
 
 interface Props {
   // Ordered list of photo ids the viewer can page through.
@@ -49,6 +50,7 @@ export default function Lightbox({ ids, index, onIndexChange, onClose, driveIds,
   const canFavorite = useCan("photoFavorite");
   const canAddToAlbum = useCan("albumAddPhoto");
   const canMoveFaces = useCan("faceMove");
+  const isDesktop = useIsDesktop();
   const count = ids.length;
   const id = ids[index];
   const hasPrev = index > 0;
@@ -99,10 +101,15 @@ export default function Lightbox({ ids, index, onIndexChange, onClose, driveIds,
   // visible at once. Resets to hover-only for each new photo.
   const [faceData, setFaceData] = useState<PhotoFaces | null>(null);
   const [showAllTags, setShowAllTags] = useState(false);
+  // Which face has its name tag open on mobile (single selection — clicking a
+  // box shows only that one and hides the other boxes). null = none selected.
+  // Reset when the photo changes.
+  const [openTag, setOpenTag] = useState<number | null>(null);
   useEffect(() => {
     if (id == null) return;
     let alive = true;
     setFaceData(null);
+    setOpenTag(null);
     getPhotoFaces(id)
       .then((f) => {
         if (alive) setFaceData(f);
@@ -310,9 +317,12 @@ export default function Lightbox({ ids, index, onIndexChange, onClose, driveIds,
               aria-pressed={showAllTags}
               onClick={(e) => {
                 e.stopPropagation();
-                setShowAllTags((v) => !v);
+                setShowAllTags((v) => {
+                  if (v) setOpenTag(null); // turning off clears the open tag
+                  return !v;
+                });
               }}
-              title={showAllTags ? "Hide tags (hover still shows)" : "Show all face tags"}
+              title={showAllTags ? "Hide face boxes" : "Show face boxes (click a box for the name)"}
               className={`h-10 w-10 justify-center px-0 sm:w-auto sm:px-space-md sm:justify-start rounded-full backdrop-blur-md border font-label-md text-label-md active:scale-[0.98] transition-all flex items-center gap-2 ${
                 showAllTags
                   ? "bg-indigo-400/15 border-indigo-400/40 text-indigo-300 hover:text-indigo-200"
@@ -524,51 +534,96 @@ export default function Lightbox({ ids, index, onIndexChange, onClose, driveIds,
                   const pos = { left: `${left}%`, top: `${top}%`, width: `${w}%`, height: `${h}%` };
                   const named = f.person_id != null;
                   const label = f.person_name ?? (named ? `Person ${f.person_id}` : null);
-                  // Hover reveals the tag by default; the Tags button pins all on.
-                  const vis = showAllTags ? "opacity-100" : "opacity-0 group-hover:opacity-100";
-                  // Facebook-style: no box — just a name tag (with a caret)
-                  // under the face. Unnamed faces show nothing.
                   if (!named) return null;
-                  return (
-                    <div key={i} className="group absolute" style={pos}>
-                      {/* Invisible hover target over the face reveals its tag. */}
-                      <button
-                        data-testid="lightbox-face-tag"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          onOpenPerson(f.person_id as number);
-                        }}
-                        aria-label={`Open ${label}`}
-                        className="absolute inset-0 pointer-events-auto cursor-pointer"
-                      />
-                      {/* Name tag + caret, centered just under the face. */}
-                      <div className={`absolute left-1/2 top-full -translate-x-1/2 mt-1 flex flex-col items-center transition-opacity ${vis}`}>
-                        <span className="h-2 w-2 -mb-1 rotate-45 bg-black/75" />
-                        <span className="pointer-events-auto flex items-center gap-1 max-w-[46vw] rounded-lg bg-black/75 backdrop-blur-sm px-3 py-1.5 text-white text-body-lg font-label-md shadow-lg ring-1 ring-white/10">
+                  // The name tag (caret + pill), shared by both layouts.
+                  const tagNode = (
+                    <>
+                      <span className="h-2 w-2 -mb-1 rotate-45 bg-black/75" />
+                      <span className="pointer-events-auto flex items-center gap-1 max-w-[46vw] rounded-lg bg-black/75 backdrop-blur-sm px-2 py-1 text-white text-label-sm sm:px-3 sm:py-1.5 sm:text-body-lg font-label-md shadow-lg ring-1 ring-white/10">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onOpenPerson(f.person_id as number);
+                          }}
+                          className="truncate cursor-pointer hover:underline"
+                        >
+                          {label}
+                        </button>
+                        {canMoveFaces && (
                           <button
+                            data-testid="lightbox-face-remove"
                             onClick={(e) => {
                               e.stopPropagation();
-                              onOpenPerson(f.person_id as number);
+                              void detachFace(f.id);
                             }}
-                            className="truncate cursor-pointer hover:underline"
+                            title="Remove this face from the person"
+                            className="shrink-0 ml-0.5 -mr-1 h-4 w-4 rounded-full flex items-center justify-center text-white/70 hover:text-white hover:bg-white/15"
                           >
-                            {label}
+                            <Icon name="close" className="text-[13px]" />
                           </button>
-                          {canMoveFaces && (
-                            <button
-                              data-testid="lightbox-face-remove"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                void detachFace(f.id);
-                              }}
-                              title="Remove this face from the person"
-                              className="shrink-0 ml-0.5 -mr-1 h-4 w-4 rounded-full flex items-center justify-center text-white/70 hover:text-white hover:bg-white/15"
-                            >
-                              <Icon name="close" className="text-[13px]" />
-                            </button>
-                          )}
-                        </span>
+                        )}
+                      </span>
+                    </>
+                  );
+
+                  // Desktop: no box — hover reveals the name tag directly (the
+                  // Tags button pins all names). Collision is a non-issue with a
+                  // cursor, and it matches the original behavior.
+                  if (isDesktop) {
+                    const vis = showAllTags
+                      ? "opacity-100"
+                      : "opacity-0 group-hover:opacity-100";
+                    return (
+                      <div key={i} className="group absolute" style={pos}>
+                        <button
+                          data-testid="lightbox-face-tag"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onOpenPerson(f.person_id as number);
+                          }}
+                          aria-label={`Open ${label}`}
+                          className="absolute inset-0 pointer-events-auto cursor-pointer"
+                        />
+                        <div
+                          className={`absolute left-1/2 top-full -translate-x-1/2 mt-1 flex flex-col items-center transition-opacity ${vis}`}
+                        >
+                          {tagNode}
+                        </div>
                       </div>
+                    );
+                  }
+
+                  // Mobile: show a box; clicking it selects that face — only its
+                  // tag shows and the other boxes hide (single selection, no
+                  // collision). The hidden boxes stay clickable so a tap on
+                  // another face switches to it; tapping the open one closes it.
+                  const open = openTag === f.id;
+                  const anyOpen = openTag != null;
+                  const boxVis = open
+                    ? "opacity-100"
+                    : anyOpen
+                      ? "opacity-0"
+                      : showAllTags
+                        ? "opacity-100"
+                        : "opacity-0 group-hover:opacity-100";
+                  const toggle = (e: MouseEvent) => {
+                    e.stopPropagation();
+                    setOpenTag((cur) => (cur === f.id ? null : f.id));
+                  };
+                  return (
+                    <div key={i} className="group absolute" style={pos}>
+                      {/* Face box — click toggles this face's name tag. */}
+                      <button
+                        data-testid="lightbox-face-tag"
+                        onClick={toggle}
+                        aria-label={open ? `Hide ${label}` : `Show ${label}`}
+                        className={`absolute inset-0 pointer-events-auto cursor-pointer rounded-md border-2 border-white/90 shadow-[0_0_0_1px_rgba(0,0,0,0.35)] transition-opacity ${boxVis}`}
+                      />
+                      {open && (
+                        <div className="absolute left-1/2 top-full -translate-x-1/2 mt-1 flex flex-col items-center">
+                          {tagNode}
+                        </div>
+                      )}
                     </div>
                   );
                 })}
