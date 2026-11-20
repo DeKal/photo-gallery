@@ -6,7 +6,7 @@ import PersonDetail from "./PersonDetail";
 import LoadingPill from "./LoadingPill";
 import Icon from "./Icon";
 import { useIsDesktop } from "../useIsDesktop";
-import { useAuth } from "../auth";
+import { useCan } from "../auth";
 
 // People load in pages (infinite scroll) like All Photos, not all at once.
 const PAGE = 120;
@@ -54,9 +54,9 @@ export default function PeopleGrid({
   // between them never remounts this component — the loaded pages just stay.
   const routedPersonId = routed && params["*"] ? Number(params["*"]) : null;
 
-  // Select/merge + hide are shown only on desktop and only to a signed-in admin.
-  const { isAdmin } = useAuth();
-  const canCurate = useIsDesktop() && isAdmin;
+  // Select/merge + hide are shown only on desktop and only to users who may
+  // curate people (hide/merge share the same access tier).
+  const canCurate = useIsDesktop() && useCan("personHide");
 
   const [persons, setPersons] = useState<Person[]>([]);
   const [total, setTotal] = useState(0);

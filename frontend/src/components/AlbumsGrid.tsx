@@ -14,7 +14,7 @@ import AlbumDialog from "./AlbumDialog";
 import ImgWithFallback from "./ImgWithFallback";
 import LoadingPill from "./LoadingPill";
 import Icon from "./Icon";
-import { useAuth } from "../auth";
+import { useCan } from "../auth";
 
 const coverPlaceholder = (
   <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-surface-container to-surface text-outline-variant" aria-hidden="true">
@@ -36,7 +36,9 @@ export default function AlbumsGrid({
   const [albums, setAlbums] = useState<Album[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { isAdmin } = useAuth();
+  const canCreate = useCan("albumCreate");
+  const canRename = useCan("albumRename");
+  const canDelete = useCan("albumDelete");
   // Selected album comes from /albums/:albumId so the detail view is linkable.
   const navigate = useNavigate();
   const params = useParams();
@@ -133,7 +135,7 @@ export default function AlbumsGrid({
         </div>
         <button
           onClick={() => setDialog({ mode: "create" })}
-          className={`h-11 px-space-md rounded-xl bg-surface-container border border-outline-variant/60 text-on-surface text-label-md font-label-md flex items-center gap-space-xs hover:bg-surface-container-high transition-colors ${isAdmin ? "" : "hidden"}`}
+          className={`h-11 px-space-md rounded-xl bg-surface-container border border-outline-variant/60 text-on-surface text-label-md font-label-md flex items-center gap-space-xs hover:bg-surface-container-high transition-colors ${canCreate ? "" : "hidden"}`}
         >
           <Icon name="add" className="text-[16px] text-primary" />
           <span>New album</span>
@@ -174,8 +176,9 @@ export default function AlbumsGrid({
                 <div className="absolute inset-0 bg-gradient-to-t from-surface-container-lowest via-surface-container-lowest/20 to-transparent opacity-95" />
 
                 {/* Rename / delete actions */}
-                {isAdmin && (
+                {(canRename || canDelete) && (
                 <div className="absolute top-3 right-3 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  {canRename && (
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
@@ -186,6 +189,8 @@ export default function AlbumsGrid({
                   >
                     <Icon name="edit" className="text-[15px]" />
                   </button>
+                  )}
+                  {canDelete && (
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
@@ -196,6 +201,7 @@ export default function AlbumsGrid({
                   >
                     <Icon name="delete" className="text-[15px]" />
                   </button>
+                  )}
                 </div>
                 )}
 

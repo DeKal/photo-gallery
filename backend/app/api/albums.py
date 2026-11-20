@@ -14,8 +14,8 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import delete, func, insert, select, text, tuple_
 from sqlalchemy.orm import Session
 
-from app.auth import require_admin
 from app.db import get_session
+from app.permissions import gate
 from app.models import Album, Photo, PhotoAlbum
 from app.schemas import (
     AlbumCoverRequest,
@@ -183,7 +183,7 @@ def photo_albums(
 def create_album(
     body: AlbumCreate,
     session: Session = Depends(get_session),
-    _: str = Depends(require_admin),
+    _: str = Depends(gate("album.create")),
 ) -> AlbumOut:
     """Create (or return the existing) album with the given name."""
     if not body.name.strip():
@@ -232,7 +232,7 @@ def rename_album(
     album_id: int,
     body: AlbumCreate,
     session: Session = Depends(get_session),
-    _: str = Depends(require_admin),
+    _: str = Depends(gate("album.rename")),
 ) -> AlbumOut:
     """Rename an album."""
     album = session.get(Album, album_id)
@@ -249,7 +249,7 @@ def rename_album(
 def delete_album(
     album_id: int,
     session: Session = Depends(get_session),
-    _: str = Depends(require_admin),
+    _: str = Depends(gate("album.delete")),
 ) -> dict[str, bool]:
     """Delete an album and its membership rows (photos themselves are kept)."""
     album = session.get(Album, album_id)
@@ -266,7 +266,7 @@ def add_photos(
     album_id: int,
     body: AlbumPhotosRequest,
     session: Session = Depends(get_session),
-    _: str = Depends(require_admin),
+    _: str = Depends(gate("album.add_photo")),
 ) -> AlbumOut:
     """Add photos to an album, ignoring ones already in it."""
     album = session.get(Album, album_id)
@@ -282,7 +282,7 @@ def remove_photos(
     album_id: int,
     body: AlbumPhotosRequest,
     session: Session = Depends(get_session),
-    _: str = Depends(require_admin),
+    _: str = Depends(gate("album.remove_photo")),
 ) -> AlbumOut:
     """Remove photos from an album (the photos themselves are kept)."""
     album = session.get(Album, album_id)
@@ -315,7 +315,7 @@ def set_cover(
     album_id: int,
     body: AlbumCoverRequest,
     session: Session = Depends(get_session),
-    _: str = Depends(require_admin),
+    _: str = Depends(gate("album.cover")),
 ) -> AlbumOut:
     """Set an album's cover photo.
 

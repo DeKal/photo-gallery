@@ -5,7 +5,7 @@ import ImgWithFallback from "./ImgWithFallback";
 import Lightbox from "./Lightbox";
 import LoadingPill from "./LoadingPill";
 import Icon from "./Icon";
-import { useAuth } from "../auth";
+import { useCan } from "../auth";
 
 const PAGE = 120;
 
@@ -51,7 +51,8 @@ export default function AllPhotosGrid({
   // Back button + album title, so the grid drops its own (keeps count + search).
   embedded?: boolean;
 }) {
-  const { isAdmin } = useAuth();
+  const canSetCover = useCan("albumCover");
+  const canRemovePhoto = useCan("albumRemovePhoto");
   const [items, setItems] = useState<PhotoListItem[]>([]);
   const [total, setTotal] = useState(0);
   const [order, setOrder] = useState<PhotoOrder>("newest");
@@ -311,8 +312,9 @@ export default function AllPhotosGrid({
                     alt={p.path}
                     placeholder={photoPlaceholder}
                   />
-                  {album && isAdmin && (
+                  {album && (canSetCover || canRemovePhoto) && (
                     <>
+                      {canSetCover && (
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
@@ -327,6 +329,8 @@ export default function AllPhotosGrid({
                       >
                         <Icon name={coverId === p.id ? "check" : "wallpaper"} className="text-base" />
                       </button>
+                      )}
+                      {canRemovePhoto && (
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
@@ -337,6 +341,7 @@ export default function AllPhotosGrid({
                       >
                         <Icon name="close" className="text-base" />
                       </button>
+                      )}
                     </>
                   )}
                   <div className="absolute inset-x-0 bottom-0 p-2 bg-gradient-to-t from-surface-dim/95 via-surface-dim/60 to-transparent opacity-0 pointer-events-none group-hover:opacity-100 group-hover:pointer-events-auto transition-opacity flex flex-col gap-1.5">

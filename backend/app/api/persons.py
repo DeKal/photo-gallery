@@ -6,8 +6,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import String, and_, cast, func, or_, select
 from sqlalchemy.orm import Session
 
-from app.auth import require_admin
 from app.db import get_session
+from app.permissions import gate
 from app.models import Face, FacePerson, Person, Photo, PhotoAlbum
 from app.schemas import (
     FaceOut,
@@ -246,7 +246,7 @@ def _set_hidden(session: Session, person_id: int, hidden: bool) -> PersonOut:
 def hide_person(
     person_id: int,
     session: Session = Depends(get_session),
-    _: str = Depends(require_admin),
+    _: str = Depends(gate("person.hide")),
 ) -> PersonOut:
     """Soft-hide a person cluster (e.g. a bad classification)."""
     return _set_hidden(session, person_id, True)
@@ -256,7 +256,7 @@ def hide_person(
 def unhide_person(
     person_id: int,
     session: Session = Depends(get_session),
-    _: str = Depends(require_admin),
+    _: str = Depends(gate("person.hide")),
 ) -> PersonOut:
     """Restore a previously hidden person cluster."""
     return _set_hidden(session, person_id, False)
@@ -359,7 +359,7 @@ def set_person_cover(
     person_id: int,
     body: SetCoverRequest,
     session: Session = Depends(get_session),
-    _: str = Depends(require_admin),
+    _: str = Depends(gate("person.cover")),
 ) -> PersonOut:
     """Set the person's cover face to one of its member faces."""
     person = session.get(Person, person_id)
@@ -384,7 +384,7 @@ def rename_person(
     person_id: int,
     body: RenameRequest,
     session: Session = Depends(get_session),
-    _: str = Depends(require_admin),
+    _: str = Depends(gate("person.rename")),
 ) -> PersonOut:
     """Set a person's name."""
     person = session.get(Person, person_id)
@@ -402,7 +402,7 @@ def rename_person(
 def merge_persons(
     body: MergeRequest,
     session: Session = Depends(get_session),
-    _: str = Depends(require_admin),
+    _: str = Depends(gate("person.merge")),
 ) -> PersonOut:
     """Merge all person clusters in ``ids`` into the first id."""
     if len(body.ids) < 2:
@@ -454,7 +454,7 @@ def merge_persons(
 def move_faces(
     body: MoveFacesRequest,
     session: Session = Depends(get_session),
-    _: str = Depends(require_admin),
+    _: str = Depends(gate("face.move")),
 ) -> dict[str, object]:
     """Reassign faces to an existing person, or to a freshly created one."""
     if body.person_id is not None:

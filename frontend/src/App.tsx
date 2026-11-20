@@ -8,7 +8,7 @@ import AllPhotosGrid from "./components/AllPhotosGrid";
 import AlbumsGrid from "./components/AlbumsGrid";
 import Icon from "./components/Icon";
 import { getPersons, getSimClusters, getPhotos, getAlbums, pickFolder } from "./api";
-import { useAuth } from "./auth";
+import { useCan } from "./auth";
 
 // Prod deploys (e.g. Vercel) have no ML worker, so scanning and folder import
 // are unavailable. VITE_NO_WORKER=1 hides that UI; browsing + curation (which
@@ -29,11 +29,11 @@ export default function App() {
   const navigate = useNavigate();
   const location = useLocation();
   const nav = navForPath(location.pathname);
-  const { isAdmin } = useAuth();
+  const canScan = useCan("scan");
 
   // Worker-backed actions (scan, folder import) require both a deployed worker
-  // and an authenticated admin.
-  const showWorker = !NO_WORKER && isAdmin;
+  // and the matching permission.
+  const showWorker = !NO_WORKER && canScan;
 
   const [refreshKey, setRefreshKey] = useState(0);
   const [scanPath, setScanPath] = useState("");

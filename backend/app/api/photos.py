@@ -9,8 +9,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import and_, func, or_, select
 from sqlalchemy.orm import Session
 
-from app.auth import require_admin
 from app.db import get_session
+from app.permissions import gate
 from app.models import Face, FacePerson, Person, Photo, PhotoAlbum
 from app.schemas import (
     FavoriteOut,
@@ -176,7 +176,7 @@ def set_favorite(
     photo_id: int,
     body: FavoriteRequest,
     session: Session = Depends(get_session),
-    _: str = Depends(require_admin),
+    _: str = Depends(gate("photo.favorite")),
 ) -> FavoriteOut:
     """Star or unstar a photo."""
     photo = session.get(Photo, photo_id)

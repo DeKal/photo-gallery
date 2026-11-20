@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { clearToken, getMe, getToken, login as apiLogin, setToken } from "./api";
+import { REQUIRES_ADMIN, type Capability } from "./permissions";
 
 // Runtime auth state. A single admin account gates curation and the worker
 // functions; anonymous visitors browse read-only. The token lives in
@@ -55,4 +56,12 @@ export function useAuth(): AuthState {
   const ctx = useContext(AuthContext);
   if (ctx == null) throw new Error("useAuth must be used within AuthProvider");
   return ctx;
+}
+
+// Whether the current user may use a capability: everyone when it doesn't
+// require admin, otherwise only a signed-in admin. Gates UI controls in sync
+// with the backend's permission map (see permissions.ts).
+export function useCan(capability: Capability): boolean {
+  const { isAdmin } = useAuth();
+  return !REQUIRES_ADMIN[capability] || isAdmin;
 }

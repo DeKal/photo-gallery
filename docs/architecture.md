@@ -90,11 +90,19 @@ dependency.
 
 Enforcement is on the **backend**, not just the UI: every mutating route (person
 hide/rename/merge, face move, album create/edit/add, favorite, and the worker's
-scan/cluster/pick-folder) declares `Depends(require_admin)` and returns 401
-without a valid `Authorization: Bearer <token>`. Read routes stay public. The
-frontend mirrors this cosmetically — `useAuth()` exposes `isAdmin`, the API client
-attaches the token (kept in `localStorage`, validated on load via `/auth/me`), and
-admin-only controls are hidden when logged out.
+scan/cluster/pick-folder) declares `Depends(gate("<capability>"))` and returns
+401 without a valid `Authorization: Bearer <token>`. Read routes stay public. The
+frontend mirrors this cosmetically — `useCan("<capability>")` hides the matching
+control when access is denied, the API client attaches the token (kept in
+`localStorage`, validated on load via `/auth/me`).
+
+Which capabilities require admin lives in **one place per side** —
+`backend/app/permissions.py` (`REQUIRES_ADMIN` + the `gate()` dependency factory)
+and `frontend/src/permissions.ts` (mirrored map, read by `useCan`). Flipping a
+capability to `False` opens it to anonymous visitors on both the API and the UI
+in a single edit; it fails closed (unknown capability ⇒ admin-only). For example
+`person.cover` (choosing a cover face) ships open — a safe, display-only pick —
+while everything else is admin-only.
 
 ## Data model
 

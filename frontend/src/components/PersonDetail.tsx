@@ -18,7 +18,7 @@ import Lightbox from "./Lightbox";
 import LoadingPill from "./LoadingPill";
 import { usePhotoParam } from "../useRouteState";
 import Icon from "./Icon";
-import { useAuth } from "../auth";
+import { useCan } from "../auth";
 
 interface Props {
   personId: number;
@@ -62,7 +62,8 @@ const photoPlaceholder = (
 // controls from the mock (Export Face Crops, Filter by Date, search, sort,
 // density, meta tags) are shown inert to match the layout.
 export default function PersonDetail({ personId, album, onBack, onChanged, onOpenPerson, onOpenSimilar }: Props) {
-  const { isAdmin } = useAuth();
+  const canRename = useCan("personRename");
+  const canSetCover = useCan("personCover");
   const [person, setPerson] = useState<Person | null>(null);
   const [photos, setPhotos] = useState<Photo[]>([]);
   const [faces, setFaces] = useState<Face[]>([]);
@@ -245,7 +246,7 @@ export default function PersonDetail({ personId, album, onBack, onChanged, onOpe
                   </div>
 
                   {/* Inline rename */}
-                  {isAdmin && (
+                  {canRename && (
                   <div className="flex items-center gap-space-sm pt-1">
                     <div className="relative flex-1 min-w-0 max-w-sm">
                       <input
@@ -272,8 +273,10 @@ export default function PersonDetail({ personId, album, onBack, onChanged, onOpe
                   )}
 
                   {/* Lazy cover-face picker toggle — faces are fetched only on
-                      first open so the page paints without waiting for them. */}
-                  {isAdmin && person.face_count > 1 && (
+                      first open so the page paints without waiting for them.
+                      Choosing a cover face is a safe display-only pick, so it's
+                      open to everyone (only rename above is admin-gated). */}
+                  {canSetCover && person.face_count > 1 && (
                     <button
                       data-testid="toggle-faces"
                       onClick={toggleFaces}
