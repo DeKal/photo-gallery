@@ -62,6 +62,14 @@ FACE_MIN_SAMPLES = 2
 # from clustering (and left unassigned to any person).
 MIN_DET_SCORE = 0.5
 MIN_BBOX_SIDE = 40.0
+# Minimum focus/sharpness (variance of the Laplacian over the grayscale face
+# crop). Out-of-focus or motion-blurred faces yield unreliable ArcFace vectors
+# that pollute clusters or get mis-absorbed into a curated person. Measured
+# across the library, clearly-unusable crops sit below ~10 while soft-but-
+# identifiable faces are 15+, so 12 drops the blurry tail without hurting them.
+# A face whose crop cannot be read is treated as sharp (never dropped on that
+# basis alone).
+MIN_SHARPNESS = 12.0
 
 
 def _l2_normalize(vecs: np.ndarray) -> np.ndarray:
@@ -89,11 +97,13 @@ def _dbscan_labels(vecs: np.ndarray) -> np.ndarray:
 
 
 def _is_strong_face(face: Face) -> bool:
-    """True if ``face`` is confident and large enough to cluster on.
+    """True if ``face`` is confident, large and sharp enough to cluster on.
 
-    Filters out low-confidence detections (``det_score < MIN_DET_SCORE``) and
-    tiny boxes (shorter bbox side ``< MIN_BBOX_SIDE`` px), which otherwise
-    pollute clusters. Malformed bboxes are treated as weak.
+    Filters out low-confidence detections (``det_score < MIN_DET_SCORE``), tiny
+    boxes (shorter bbox side ``< MIN_BBOX_SIDE`` px) and out-of-focus crops
+    (``sharpness < MIN_SHARPNESS``), which otherwise pollute clusters. Malformed
+    bboxes are treated as weak; a null sharpness (face indexed before 008 and
+    not yet backfilled) is not held against the face.
     """
     if face.det_score is None or face.det_score < MIN_DET_SCORE:
         return False
@@ -102,6 +112,8 @@ def _is_strong_face(face: Face) -> bool:
         return False
     x1, y1, x2, y2 = (float(v) for v in bbox[:4])
     if min(abs(x2 - x1), abs(y2 - y1)) < MIN_BBOX_SIDE:
+        return False
+    if face.sharpness is not None and face.sharpness < MIN_SHARPNESS:
         return False
     return True
 

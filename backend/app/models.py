@@ -55,6 +55,10 @@ class Face(Base):
     det_score: Mapped[float] = mapped_column(Float)
     vec: Mapped[list[float]] = mapped_column(Vector(512))
     thumb_path: Mapped[str | None] = mapped_column(String, nullable=True)
+    # Focus measure (variance of the Laplacian over the grayscale crop), set at
+    # scan time. Cheap, non-deferred column so clustering can filter out blurry
+    # faces without decoding every crop. Null for faces indexed before 008.
+    sharpness: Mapped[float | None] = mapped_column(Float, nullable=True)
     # Cropped-face JPEG bytes stored in-DB (see Photo.thumb_data). Deferred for
     # the same reason: only /face-thumb reads it, one row at a time.
     thumb_data: Mapped[bytes | None] = mapped_column(

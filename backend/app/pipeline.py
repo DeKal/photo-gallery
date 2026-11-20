@@ -17,6 +17,8 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from pathlib import Path
 
+from PIL import Image
+
 from app.analyzer import detect_faces, embed_images
 from app.config import settings
 from app.db import SessionLocal
@@ -26,6 +28,7 @@ from app.scanner import (
     UnreadableImageError,
     file_sha256,
     file_taken_at,
+    image_sharpness,
     iter_images,
     load_image,
     make_face_thumbnail,
@@ -258,6 +261,8 @@ def _index_prepared(session, prepared: dict) -> int | None:
         )
         face_row.thumb_path = str(thumb_path)
         face_row.thumb_data = Path(thumb_path).read_bytes()
+        # Tag the crop's focus so clustering can drop blurry faces cheaply.
+        face_row.sharpness = image_sharpness(Image.open(thumb_path))
 
     return photo.id
 

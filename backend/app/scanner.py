@@ -191,3 +191,20 @@ def make_face_thumbnail(
     thumb_path = faces_dir / f"{face_key}.jpg"
     crop.save(thumb_path, format="JPEG", quality=88)
     return thumb_path
+
+
+def image_sharpness(image: Image.Image) -> float:
+    """Focus measure for ``image``: variance of the Laplacian over grayscale.
+
+    Higher means sharper; out-of-focus or motion-blurred crops score low. Used
+    at scan time to tag each face crop so clustering can drop blurry faces
+    without re-decoding images. Computed on the stored crop (not the full
+    photo) so a one-off backfill of existing faces matches new scans.
+    """
+    import cv2
+    import numpy as np
+
+    gray = np.asarray(image.convert("L"), dtype=np.float64)
+    if gray.size == 0:
+        return 0.0
+    return float(cv2.Laplacian(gray, cv2.CV_64F).var())
